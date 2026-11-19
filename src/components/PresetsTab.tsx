@@ -63,57 +63,114 @@ export function PresetsTab({
     setTimeout(() => setCopiedPresetId(prev => (prev === preset.id ? null : prev)), 1800);
   };
 
+  const getEvalPrefs = (preset: ModPreset) =>
+    preset.recommendedPrefs
+      ? ({
+          gpu: 'amd-intel',
+          mode: 'singleplayer',
+          useShaders: false,
+          useCreate: false,
+          allowSinytra: false,
+          goal: 'max-safe',
+          ...preset.recommendedPrefs,
+        } as const)
+      : undefined;
+
+  const getRenderLabel = (preset: ModPreset) => {
+    const set = new Set(preset.modIds);
+    if (set.has('emberbium') && set.has('nvidium')) return 'Emberbium + Nvidium';
+    if (set.has('oculus') && set.has('alloyium')) return 'Embeddium + Oculus + Alloyium';
+    if (set.has('oculus')) return 'Embeddium + Oculus';
+    if (set.has('amd-fsr-upscaler-render-scale-for-embeddium')) return 'Embeddium + AMD FSR';
+    if (set.has('alloyium')) return 'Embeddium + Alloyium';
+    return 'Embeddium';
+  };
+
+  const getSinytraLabel = (preset: ModPreset) => {
+    const set = new Set(preset.modIds);
+    return set.has('sinytra-connector') ? 'Да (FFAPI + Extras)' : 'Нет (чистый Forge)';
+  };
+
+  const getBadgeTone = (color: ModPreset['badgeColor']) => {
+    switch (color) {
+      case 'emerald':
+        return 'text-[#3ddc84]';
+      case 'sky':
+        return 'text-[#5cb3ff]';
+      case 'violet':
+        return 'text-[#b794f4]';
+      case 'amber':
+        return 'text-[#e5a93c]';
+      case 'rose':
+        return 'text-[#f0758c]';
+      default:
+        return 'text-[#8b9199]';
+    }
+  };
+
   return (
     <div className="space-y-4">
-      {MOD_PRESETS.length === 2 && (() => {
-        const [p1, p2] = MOD_PRESETS;
-        const s1 = summarizeAssemblyImpact(p1.modIds);
-        const s2 = summarizeAssemblyImpact(p2.modIds);
-        const f1 = estimateFpsRange(p1.modIds, s1);
-        const f2 = estimateFpsRange(p2.modIds, s2);
+      {MOD_PRESETS.length >= 2 && (() => {
+        const evaluated = MOD_PRESETS.map(p => {
+          const evalPrefs = getEvalPrefs(p);
+          const health = evaluateAssemblyHealth(p.modIds);
+          const summary = summarizeAssemblyImpact(p.modIds, health, evalPrefs);
+          const fps = estimateFpsRange(p.modIds, summary, evalPrefs);
+          return { preset: p, summary, fps };
+        });
+
         const rows = [
           {
             label: 'Рендер-связка',
-            v1: 'Emberbium + Nvidium',
-            v2: 'Embeddium + Alloyium',
+            values: evaluated.map(e => getRenderLabel(e.preset)),
           },
           {
             label: 'Sinytra Connector',
-            v1: 'Да (FFAPI + Connector Extras)',
-            v2: 'Не обязательна (нативный Forge приоритет)',
+            values: evaluated.map(e => getSinytraLabel(e.preset)),
           },
           {
             label: 'Прогноз FPS / ОЗУ',
-            v1: `${f1.label} · ${s1.resourceBalance.ramDeltaLabel}`,
-            v2: `${f2.label} · ${s2.resourceBalance.ramDeltaLabel}`,
+            values: evaluated.map(e => `${e.fps.shortLabel.replace(' (оценка)', '')} · ${e.summary.resourceBalance.ramDeltaLabel}`),
           },
           {
             label: 'Шанс артефактов',
-            v1: `${s1.artifactRisk.chancePct}% · ${s1.artifactRisk.label}`,
-            v2: `${s2.artifactRisk.chancePct}% · ${s2.artifactRisk.label}`,
+            values: evaluated.map(e => `${e.summary.artifactRisk.chancePct}% · ${e.summary.artifactRisk.label}`),
           },
           {
             label: 'Итог (Оценка · Моды)',
-            v1: `${s1.assemblyScore}/100 б. · ${p1.modIds.length} модов · ${s1.coveredSubsystems.length}/7 подсистем`,
-            v2: `${s2.assemblyScore}/100 б. · ${p2.modIds.length} модов · ${s2.coveredSubsystems.length}/7 подсистем`,
+            values: evaluated.map(
+              e => `${e.summary.assemblyScore}/100 · ${e.preset.modIds.length} м. · ${e.summary.coveredSubsystems.length}/7`
+            ),
           },
         ];
+
         return (
           <div className="bg-[#1a1d21] border border-[#2a2e33] rounded-[6px] overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-[#2a2e33] bg-[#121417] text-[#8b9199]">
-                  <th className="py-2 px-4 font-semibold">Критерий</th>
-                  <th className="py-2 px-4 font-semibold text-[#3ddc84]">{p1.name.split('(')[0].trim()}</th>
-                  <th className="py-2 px-4 font-semibold text-[#e6e8ea]">{p2.name.split('(')[0].trim()}</th>
+                  <th className="py-2 px-3.5 font-semibold whitespace-nowrap">Критерий</th>
+                  {evaluated.map(({ preset }, idx) => (
+                    <th
+                      key={preset.id}
+                      className={`py-2 px-3.5 font-semibold whitespace-nowrap ${
+                        idx === 0 ? 'text-[#3ddc84]' : 'text-[#e6e8ea]'
+                      }`}
+                    >
+                      {preset.name.split('(')[0].trim()}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#2a2e33]">
                 {rows.map(r => (
                   <tr key={r.label} className="hover:bg-[#22262b] transition-colors duration-150">
-                    <td className="py-2 px-4 text-[#8b9199] font-medium whitespace-nowrap">{r.label}</td>
-                    <td className="py-2 px-4 text-[#e6e8ea] font-mono tabular-nums">{r.v1}</td>
-                    <td className="py-2 px-4 text-[#e6e8ea] font-mono tabular-nums">{r.v2}</td>
+                    <td className="py-2 px-3.5 text-[#8b9199] font-medium whitespace-nowrap">{r.label}</td>
+                    {r.values.map((val, idx) => (
+                      <td key={`${r.label}-${idx}`} className="py-2 px-3.5 text-[#e6e8ea] font-mono tabular-nums whitespace-nowrap">
+                        {val}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -124,15 +181,15 @@ export function PresetsTab({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {MOD_PRESETS.map(preset => {
+          const evalPrefs = getEvalPrefs(preset);
           const treeNodes = organizeAssemblyTree(preset.modIds);
           const parentWithAddons = treeNodes.filter(n => n.children.length > 0);
           const standaloneRoots = treeNodes.filter(n => n.children.length === 0);
-          const badgeTone =
-            preset.badgeColor === 'emerald' ? 'text-[#3ddc84]' : 'text-[#8b9199]';
+          const badgeTone = getBadgeTone(preset.badgeColor);
 
           const presetHealth = evaluateAssemblyHealth(preset.modIds);
-          const presetSummary = summarizeAssemblyImpact(preset.modIds, presetHealth);
-          const presetFps = estimateFpsRange(preset.modIds, presetSummary);
+          const presetSummary = summarizeAssemblyImpact(preset.modIds, presetHealth, evalPrefs);
+          const presetFps = estimateFpsRange(preset.modIds, presetSummary, evalPrefs);
           const presetRedCount =
             presetHealth.conflicts.length +
             presetHealth.warnings.filter(w => w.severity === 'red').length;

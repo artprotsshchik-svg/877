@@ -91,7 +91,14 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
       notes.push(`Упор на ${activeAnchor.name}: подключена альтернативная связка Emberbium + Emberlens (вместо Embeddium + Oculus + Nvidium).`);
     } else if (aid === 'emberbium') {
       notes.push('Упор на Emberbium: выбран в качестве базового 3D-рендера вместо Embeddium (совместим с Nvidium, Flerovium и Chloride; для шейдеров включите опцию «Шейдеры»).');
-    } else if (aid === 'oculus' || aid === 'faster-iris-shadow-mapper') {
+    } else if (
+      aid === 'oculus' ||
+      aid === 'faster-iris-shadow-mapper' ||
+      aid === 'shadowlod' ||
+      aid === 'ggtu' ||
+      aid === 'unofficial-luxium-compatibility-luxium-oculus' ||
+      aid === 'bons-dlss-diet-complementary-unbound'
+    ) {
       effectivePrefs.useShaders = true;
       if (effectivePrefs.goal === 'potato') effectivePrefs.goal = 'balanced';
       notes.push(`Упор на ${activeAnchor.name}: включён шейдерный стек Embeddium + Oculus (Nvidium исключён).`);
@@ -147,12 +154,15 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
     'fastvancements',
     'clumps',
     'let-me-despawn',
+    'falling-blocks-fps-fix',
+    'fast-sounds',
     'reload-looping-sound-fix',
     'cloth-config-v12',
     'matlib',
   ]);
   if (!isPotato) {
     ids.add('flerovium');
+    ids.add('fast-item-frames');
   }
   if (isHeavyPack) {
     [
@@ -189,12 +199,13 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
         ids.add('emi-ores');
         ids.add('emiffect');
         ids.add('emi-professions');
+        ids.add('emi-trades');
       }
     }
     notes.push('Просмотрщик рецептов: EMI + прослойка TMRV Updated (запускает плагины JEI внутри EMI без самого JEI).');
     excluded.push({ name: 'Just Enough Items (JEI) + JEIOptimizer / Threads', reason: 'Заменены на EMI + TMRV Updated.' });
     if (isHeavy && isHeavyPack) {
-      excluded.push({ name: 'JER / JEP / JEED', reason: 'Полностью перекрыты более быстрыми нативными EMI-плагинами (EMI Loot + EMI Ores, EMI Professions, EMIffect).' });
+      excluded.push({ name: 'JER / JEP / JEED', reason: 'Полностью перекрыты более быстрыми нативными EMI-плагинами (EMI Loot, Ores, EMIffect, Professions, Trades).' });
     }
   } else if (recipeViewer === 'emi-jei') {
     ids.add('emi');
@@ -208,6 +219,7 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
         ids.add('emi-ores');
         ids.add('emiffect');
         ids.add('emi-professions');
+        ids.add('emi-trades');
         ids.add('just-enough-freezes');
         ids.add('just-enough-threads');
       }
@@ -235,9 +247,6 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
       ids.add('cupboard');
       ids.add('fast-ip-ping');
       ids.add('spark');
-      if (!effectivePrefs.allowSinytra && isHeavy) {
-        ids.add('vmp-forge');
-      }
       notes.push('Для сетевой игры добавлены ServerCore, Connectivity (+ Cupboard), Fast IP Ping и Spark.');
     } else {
       ids.add('smooth-boot-reloaded');
@@ -274,7 +283,7 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
       excluded.push({ name: 'ServerCore / Connectivity / Cupboard', reason: 'Сетевые моды исключены в одиночном режиме (в соло не дают прироста).' });
     }
     excluded.push({ name: 'RestMode / More Culling / Better Biome Reblend', reason: 'Исключены из-за наложения с Dynamic FPS / CullLessLeaves и архивации Better Biome Reblend.' });
-    notes.push('Для максимальной сборки добавлены высокоэффективные моды без раздувания миксинов: Kerria, LightStar, Particle Core, FastSuite, Structure DFU/Layout, Immersive Optimization, Falling Blocks FPS Fix, StutterFix + ThreadTweak и Fast Item Frames.');
+    notes.push('Для максимальной сборки добавлены высокоэффективные моды без раздувания миксинов: Kerria, LightStar, Particle Core, FastSuite (нужен Placebo), Structure DFU/Layout, Immersive Optimization, Falling Blocks FPS Fix, StutterFix + ThreadTweak и Fast Item Frames.');
   } else {
     excluded.push({ name: 'FastSuite / Structure DFU Cache', reason: 'Опциональные кеши для тяжёлых сборок пропущены в лёгком/сбалансированном профиле.' });
   }
@@ -315,12 +324,18 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
     notes.push('Режим слабой графики: добавлены AMD FSR апскейлер, DynamicRenderDistance, PartiCull (без тяжёлого Kotlin), Fast Item Frames и Immersive Optimization (без дубля RestMode).');
     excluded.push({ name: 'FastBoot / RestMode / Accelerated Rendering / Alloyium', reason: 'FastBoot встроен в ModernFix, RestMode дублирует Dynamic FPS, а Compute Shaders перегружают слабую GPU.' });
   } else if (!useNvidium) {
-    ids.add('alloyium');
-    if (activeAnchor?.id === 'accelerated-rendering') {
-      ids.add('accelerated-rendering');
-      notes.push('Для дискретной GPU добавлены Alloyium, Flerovium и Accelerated Rendering (OpenGL 4.6 — расходует больше VRAM GPU).');
+    if (activeAnchor?.id === 'emberbium') {
+      ids.delete('embeddium');
+      ids.add('emberbium');
+      notes.push('Выбран Emberbium + Flerovium + Kerria (Alloyium исключён, так как несовместим с Emberbium).');
     } else {
-      notes.push('Добавлен Alloyium + Flerovium (нативный Compute-аддон к Embeddium для любых видеокарт без Sinytra и с минимальным риском артефактов).');
+      ids.add('alloyium');
+      if (activeAnchor?.id === 'accelerated-rendering') {
+        ids.add('accelerated-rendering');
+        notes.push('Для дискретной GPU добавлены Alloyium, Flerovium и Accelerated Rendering (OpenGL 4.6 — расходует больше VRAM GPU).');
+      } else {
+        notes.push('Добавлен Alloyium + Flerovium (нативный Compute-аддон к Embeddium для любых видеокарт без Sinytra и с минимальным риском артефактов).');
+      }
     }
   } else {
     const canUseEmberbium =

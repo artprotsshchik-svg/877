@@ -1,3 +1,4 @@
+import type { AssemblyPreferences } from '../utils/modTypes.ts';
 import metaData from './db/meta.json';
 import renderMods from './db/mods-render.json';
 import memoryCpuMods from './db/mods-memory-cpu.json';
@@ -71,6 +72,7 @@ export interface ModPreset {
   description: string;
   crashRisk: string;
   modIds: string[];
+  recommendedPrefs?: Partial<AssemblyPreferences>;
 }
 
 export interface GoldenStandardEntry {

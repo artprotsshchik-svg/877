@@ -35,24 +35,33 @@ const DEFAULT_CHECKED_MOD_IDS: string[] = [
   'embeddium',
   'sodium-chloride',
   'alloyium',
+  'flerovium',
   'immediatelyfast',
+  'kerria',
   'entity-culling',
-  'more-culling-reforged',
   'enhanced-block-entities-reloaded',
   'matlib',
   'culllessleaves-reforged',
+  'fast-item-frames',
   'modernfix',
   'ferritecore',
   'alltheleaks-memory-leak-fix',
+  'jasione',
+  'put-a-plug-in-it-papi',
   'radium-re-reforged',
   'badoptimizations',
   'noisiumed',
+  'solix',
+  'falling-blocks-fps-fix',
   'ixeris',
   'smooth-boot-reloaded',
   'dynamic-fps',
   'clumps',
+  'let-me-despawn',
   'packet-fixer',
-  'spark',
+  'krypton-reno',
+  'reload-looping-sound-fix',
+  'cloth-config-v12',
 ];
 
 interface HistorySnapshot {
@@ -371,6 +380,13 @@ export default function App() {
   };
 
   const loadPresetToBuilder = (preset: ModPreset) => {
+    if (preset.recommendedPrefs) {
+      setBuilderPrefs(prev => ({
+        ...prev,
+        ...preset.recommendedPrefs,
+        focusModId: null,
+      }));
+    }
     setBuilderModIds([...preset.modIds]);
     setActiveTab('assembler');
   };

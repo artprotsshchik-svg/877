@@ -45,9 +45,19 @@ test('all mods have valid CurseForge URLs, non-empty fields, and 100% MOD_GROUPS
   }
 });
 
-test('all core Nvidium and Alloyium presets have zero conflicts, zero red warnings, and zero yellow warnings', () => {
-  assert.equal(MOD_PRESETS.length, 2, `Expected 2 core Nvidium/Alloyium presets, got ${MOD_PRESETS.length}`);
-  assert.ok(MOD_PRESETS.every(p => p.modIds.includes('nvidium') || p.modIds.includes('alloyium')));
+test('all 5 recreated presets have zero conflicts, zero warnings, 7/7 subsystem coverage, and zero red mods', async () => {
+  const { summarizeAssemblyImpact } = await import('./modAnalyzer.ts');
+  assert.equal(MOD_PRESETS.length, 5, `Expected 5 curated presets, got ${MOD_PRESETS.length}`);
+  const expectedIds = [
+    'user-nvidium-emberbium',
+    'user-alloyium-embeddium',
+    'preset-shaders-oculus',
+    'preset-server-multiplayer',
+    'preset-potato-low-end',
+  ];
+  for (const id of expectedIds) {
+    assert.ok(MOD_PRESETS.some(p => p.id === id), `Missing expected preset "${id}"`);
+  }
 
   for (const preset of MOD_PRESETS) {
     const analysis = analyzeSelection(preset.modIds);
@@ -73,9 +83,18 @@ test('all core Nvidium and Alloyium presets have zero conflicts, zero red warnin
       assert.notEqual(
         tier.tier,
         'red',
-        `Core preset "${preset.id}" contains RED mod "${mod.name}" (${tier.reason})`
+        `Preset "${preset.id}" contains RED mod "${mod.name}" (${tier.reason})`
       );
     }
+
+    const summary = summarizeAssemblyImpact(preset.modIds, analysis, {
+      ...INITIAL_BUILDER_PREFS,
+      ...preset.recommendedPrefs,
+    });
+    assert.equal(summary.overlaps.length, 0, `Preset "${preset.id}" has overlaps`);
+    assert.equal(summary.zeroOrLowImpactIds.length, 0, `Preset "${preset.id}" has zero/low impact mods`);
+    assert.ok(summary.assemblyScore >= 96, `Preset "${preset.id}" expected score >= 96, got ${summary.assemblyScore}`);
+    assert.equal(summary.coveredSubsystems.length, 7, `Preset "${preset.id}" should cover all 7 subsystems`);
   }
 });
 
@@ -821,7 +840,7 @@ test('DATABASE_UPDATED_AT, per-mod update labels, organizeAssemblyTree, and form
   const byParentId = new Map(nvidiumTree.map(n => [n.parent.id, n.children.map(c => c.mod.id)]));
 
   const emberKids = byParentId.get('emberbium') ?? [];
-  for (const expected of ['nvidium', 'flerovium', 'immediatelyfast', 'sodium-embeddium-options-api', 'sodium-embeddium-dynamic-lights']) {
+  for (const expected of ['nvidium', 'flerovium', 'immediatelyfast', 'kerria', 'sodium-chloride']) {
     assert.ok(emberKids.includes(expected), `Expected ${expected} nested under emberbium`);
   }
 
@@ -838,6 +857,18 @@ test('DATABASE_UPDATED_AT, per-mod update labels, organizeAssemblyTree, and form
 
   const soundKids = byParentId.get('fast-sounds') ?? [];
   assert.ok(soundKids.includes('soundgc'));
+
+  // Verify shader and server preset nesting (Oculus -> Embeddium, so top root is embeddium)
+  const shaderPreset = MOD_PRESETS.find(p => p.id === 'preset-shaders-oculus')!;
+  const shaderTree = new Map(organizeAssemblyTree(shaderPreset.modIds).map(n => [n.parent.id, n.children.map(c => c.mod.id)]));
+  const embedShaderKids = shaderTree.get('embeddium') ?? [];
+  assert.ok(embedShaderKids.includes('oculus'), 'Expected oculus nested under embeddium');
+  assert.ok(embedShaderKids.includes('shadowlod'), 'Expected shadowlod nested under embeddium root');
+  assert.ok(embedShaderKids.includes('faster-iris-shadow-mapper'), 'Expected faster-iris-shadow-mapper nested under embeddium root');
+
+  const serverPreset = MOD_PRESETS.find(p => p.id === 'preset-server-multiplayer')!;
+  const serverTree = new Map(organizeAssemblyTree(serverPreset.modIds).map(n => [n.parent.id, n.children.map(c => c.mod.id)]));
+  assert.ok((serverTree.get('connectivity') ?? []).includes('cupboard'), 'Expected cupboard nested under connectivity');
 
   // Formatted export renders 1-indexed parent mods, indented child arrows, update labels, and CurseForge URLs
   const formattedWithUrls = formatAssemblyTreeText(nvidiumPreset.modIds, true);
@@ -1641,10 +1672,15 @@ test('optimized presets and bloat-free buildSmartAssembly achieve high scores wi
     for (const staple of ['entity-culling', 'clumps', 'let-me-despawn']) {
       assert.ok(preset.modIds.includes(staple), `Preset ${preset.id} should include ${staple}`);
     }
-    const summary = summarizeAssemblyImpact(preset.modIds);
-    assert.ok(summary.assemblyScore >= 93, `Preset ${preset.id} expected score >= 93, got ${summary.assemblyScore}`);
-    assert.equal(summary.overlaps.length, 0, `Preset ${preset.id} has overlaps`);
-    assert.equal(summary.zeroOrLowImpactIds.length, 0, `Preset ${preset.id} has zero-impact mods`);
+    const summaryDefault = summarizeAssemblyImpact(preset.modIds);
+    const summaryCtx = summarizeAssemblyImpact(preset.modIds, undefined, {
+      ...INITIAL_BUILDER_PREFS,
+      ...preset.recommendedPrefs,
+    });
+    assert.ok(summaryDefault.assemblyScore >= 94, `Preset ${preset.id} expected default score >= 94, got ${summaryDefault.assemblyScore}`);
+    assert.ok(summaryCtx.assemblyScore >= 96, `Preset ${preset.id} expected ctx score >= 96, got ${summaryCtx.assemblyScore}`);
+    assert.equal(summaryCtx.overlaps.length, 0, `Preset ${preset.id} has overlaps`);
+    assert.equal(summaryCtx.zeroOrLowImpactIds.length, 0, `Preset ${preset.id} has zero-impact mods`);
   }
 
   const singleProfiles: AssemblyPreferences[] = [
@@ -1866,4 +1902,40 @@ test('upgraded combinations (Kerria, LightStar, Falling Blocks FPS Fix, Particle
   assert.ok(hybridMax.modIds.includes('spark'));
   assert.ok(hybridMax.modIds.includes('entity-collision-optimization'));
   assert.equal(analyzeSelection(hybridMax.modIds).conflicts.length, 0);
+
+  // 5. Shader addon anchor (shadowlod) auto-enables shaders & avoids Nvidium; emberbium anchor on AMD excludes alloyium; heavy EMI pack includes emi-trades
+  const shadowAnchorBuild = buildSmartAssembly({
+    ...maxPrefs,
+    gpu: 'nvidia',
+    allowSinytra: true,
+    useShaders: false,
+    focusModId: 'shadowlod',
+  });
+  assert.ok(shadowAnchorBuild.modIds.includes('oculus'));
+  assert.ok(shadowAnchorBuild.modIds.includes('shadowlod'));
+  assert.ok(!shadowAnchorBuild.modIds.includes('nvidium'));
+  assert.equal(analyzeSelection(shadowAnchorBuild.modIds).conflicts.length, 0);
+
+  const emberAmdBuild = buildSmartAssembly({
+    ...maxPrefs,
+    gpu: 'amd-intel',
+    allowSinytra: false,
+    portStrategy: 'native-forge',
+    focusModId: 'emberbium',
+  });
+  assert.ok(emberAmdBuild.modIds.includes('emberbium'));
+  assert.ok(!emberAmdBuild.modIds.includes('embeddium'));
+  assert.ok(!emberAmdBuild.modIds.includes('alloyium'));
+  assert.equal(analyzeSelection(emberAmdBuild.modIds).conflicts.length, 0);
+
+  const heavyEmiBuild = buildSmartAssembly({
+    ...maxPrefs,
+    packScale: 'heavy',
+    recipeViewer: 'emi',
+  });
+  assert.ok(heavyEmiBuild.modIds.includes('emi-trades'));
+  assert.ok(heavyEmiBuild.modIds.includes('emi-ores'));
+  assert.ok(heavyEmiBuild.modIds.includes('emiffect'));
+  assert.ok(heavyEmiBuild.modIds.includes('emi-professions'));
+  assert.equal(analyzeSelection(heavyEmiBuild.modIds).conflicts.length, 0);
 });
