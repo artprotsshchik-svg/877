@@ -2737,7 +2737,6 @@
     "isGroupLeader": true,
     "isGroupAddon": false,
     "addons": [
-      "emi",
       "jei-emi-optimizations",
       "optimized-recipe-book-orb",
       "fastvancements",
@@ -2747,7 +2746,6 @@
       "jeioptimizer",
       "just-enough-freezes",
       "just-enough-threads",
-      "tmrv-updated",
       "fast-recipe-search"
     ],
     "coveredBy": ""

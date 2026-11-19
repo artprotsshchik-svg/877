@@ -254,6 +254,18 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
     }
   }
 
+  if (isHeavyPack && !isPotato) {
+    [
+      'stutterfix-reforged',
+      'threadtweak-reforged',
+    ].forEach(id => ids.add(id));
+  }
+
+  if (effectivePrefs.mode !== 'singleplayer' && (isHeavy || (isHeavyPack && !isPotato))) {
+    ids.add('alternate-current');
+    ids.add('entity-collision-optimization');
+  }
+
   if (isHeavy) {
     [
       'duplicate-nbt-flattener',
@@ -274,10 +286,6 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
     if (!isPotato) {
       ids.add('particle-core');
       excluded.push({ name: 'PartiCull', reason: 'Полностью перекрыт Particle Core в максимальной сборке.' });
-    }
-    if (effectivePrefs.mode !== 'singleplayer') {
-      ids.add('alternate-current');
-      ids.add('entity-collision-optimization');
     }
     if (effectivePrefs.mode === 'singleplayer') {
       excluded.push({ name: 'ServerCore / Connectivity / Cupboard', reason: 'Сетевые моды исключены в одиночном режиме (в соло не дают прироста).' });
@@ -353,11 +361,9 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
     ids.add('oculus');
     ids.add('faster-iris-shadow-mapper');
     ids.add('gputape');
-    if (isHeavy) {
-      ids.add('shadowlod');
-    }
+    ids.add('shadowlod');
     notes.push(
-      `Активированы шейдеры: Oculus + Faster Iris Shadow Mapper${isHeavy ? ' + ShadowLOD' : ''} + GPUTape (стандартный стек на Embeddium).`
+      'Активированы шейдеры: Oculus + Faster Iris Shadow Mapper + ShadowLOD + GPUTape (стандартный стек на Embeddium).'
     );
     excluded.push({ name: 'Emberlens', reason: 'Форк Oculus, требующий Emberbium вместо Embeddium (исключён во избежание конфликта).' });
     if (effectivePrefs.allowSinytra) {
@@ -390,10 +396,11 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
     (activeAnchor?.id === 'concurrent-chunk-management-engine-forge-c2me' ||
       (!isPotato && (effectivePrefs.mode !== 'singleplayer' || isHeavyPack)));
 
+  const needVmp = effectivePrefs.mode !== 'singleplayer' && (isHeavy || (isHeavyPack && !isPotato));
   const useFabricVMP =
     effectivePrefs.allowSinytra &&
     activeAnchor?.id !== 'vmp-forge' &&
-    (activeAnchor?.id === 'very-many-players-vmp' || (portStrategy === 'fabric-sinytra' && effectivePrefs.mode !== 'singleplayer' && isHeavy));
+    (activeAnchor?.id === 'very-many-players-vmp' || (portStrategy === 'fabric-sinytra' && needVmp));
 
   if (useFabricC2ME) {
     ids.add('c2me-concurrent-chunk-management-engine');
@@ -409,7 +416,7 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
     ids.add('very-many-players-vmp');
     ids.delete('vmp-forge');
     excluded.push({ name: 'Very Many Players (Forge)', reason: 'Выбрана Fabric-версия VMP через Sinytra Connector.' });
-  } else if (effectivePrefs.mode !== 'singleplayer' && isHeavy) {
+  } else if (needVmp) {
     ids.add('vmp-forge');
     if (effectivePrefs.allowSinytra) {
       excluded.push({ name: 'VMP (Fabric)', reason: 'Выбран нативный VMP (Forge) без конфликтов миксинов через Sinytra.' });
@@ -803,6 +810,21 @@ export function smartFixAssembly(selectedIds: string[], prefs?: AssemblyPreferen
     }
   }
 
+  if (
+    (next.has('c2me-concurrent-chunk-management-engine') ||
+      next.has('concurrent-chunk-management-engine-forge-c2me') ||
+      next.has('c2mer')) &&
+    focusId !== 'canary' &&
+    focusId !== 'radium-reforged'
+  ) {
+    let swappedOldLithium = false;
+    if (next.delete('canary')) swappedOldLithium = true;
+    if (next.delete('radium-reforged')) swappedOldLithium = true;
+    if (swappedOldLithium && !next.has('radium-re-reforged') && !getRuleConflictingIds('radium-re-reforged').some(c => next.has(c))) {
+      next.add('radium-re-reforged');
+    }
+  }
+
   // Auto-add paired companion fixes flagged by analyzeSelection
   if (next.has('calm-the-leaks') && !next.has('alltheleaks-memory-leak-fix')) {
     next.add('alltheleaks-memory-leak-fix');
@@ -982,7 +1004,12 @@ export function toggleModSmart(
   const evictedIds = new Set<string>();
   const addedDeps: string[] = [];
 
-  if (options.prefs?.recipeViewer === 'emi' && mod.recipeEcosystem === 'jei-plugin' && !next.has('emi')) {
+  if (
+    options.prefs?.recipeViewer === 'emi' &&
+    mod.recipeEcosystem === 'jei-plugin' &&
+    !next.has('emi') &&
+    !next.has('just-enough-items-jei')
+  ) {
     next.add('emi');
     addedDeps.push(MOD_BY_ID.get('emi')?.name || 'EMI');
   }
@@ -1008,6 +1035,53 @@ export function toggleModSmart(
       }
       next.add(depId);
       addedDeps.push(MOD_BY_ID.get(depId)?.name || depId);
+    }
+  }
+
+  const addCompanionIfSafe = (companionId: string) => {
+    if (next.has(companionId)) return;
+    if (getRuleConflictingIds(companionId).some(cid => next.has(cid))) return;
+    next.add(companionId);
+    addedDeps.push(MOD_BY_ID.get(companionId)?.name || companionId);
+    for (const cdep of getTransitiveDependencies(companionId, new Set(), next)) {
+      if (!next.has(cdep) && !getRuleConflictingIds(cdep).some(cid => next.has(cid))) {
+        next.add(cdep);
+        addedDeps.push(MOD_BY_ID.get(cdep)?.name || cdep);
+      }
+    }
+  };
+
+  if (modId === 'calm-the-leaks') {
+    addCompanionIfSafe('alltheleaks-memory-leak-fix');
+  }
+  if (modId === 'advanced-loot-info-ali') {
+    addCompanionIfSafe('fastali');
+  }
+  if (modId === 'c2me-concurrent-chunk-management-engine') {
+    addCompanionIfSafe('connector-extras');
+  }
+  if (
+    next.has('distant-horizons') &&
+    (next.has('oculus') || next.has('emberlens')) &&
+    (modId === 'distant-horizons' || modId === 'oculus' || modId === 'emberlens')
+  ) {
+    addCompanionIfSafe('distant-horizons-memory-fix-dh');
+  }
+  if (
+    (modId === 'c2me-concurrent-chunk-management-engine' ||
+      modId === 'concurrent-chunk-management-engine-forge-c2me' ||
+      modId === 'c2mer') &&
+    (next.has('canary') || next.has('radium-reforged'))
+  ) {
+    for (const oldLithiumId of ['canary', 'radium-reforged']) {
+      if (next.delete(oldLithiumId)) {
+        evictedIds.add(oldLithiumId);
+        removedNames.push(MOD_BY_ID.get(oldLithiumId)?.name || oldLithiumId);
+      }
+    }
+    if (!next.has('radium-re-reforged') && !getRuleConflictingIds('radium-re-reforged').some(cid => next.has(cid))) {
+      next.add('radium-re-reforged');
+      addedDeps.push(MOD_BY_ID.get('radium-re-reforged')?.name || 'Radium Re-Reforged');
     }
   }
 

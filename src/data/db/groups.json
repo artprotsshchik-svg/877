@@ -143,7 +143,6 @@
     "leaderId": "distant-horizons",
     "addonIds": [
       "nvidium",
-      "voxy",
       "revidium-accedium",
       "distant-horizons-memory-fix-dh"
     ],
@@ -834,7 +833,6 @@
     "exclusive": false,
     "leaderId": "dynamicrenderdistance",
     "addonIds": [
-      "drd-dynamic-render-distance",
       "config-preset-switch-low-medium-high-f10"
     ],
     "memberIds": [

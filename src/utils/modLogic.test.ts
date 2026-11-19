@@ -1939,3 +1939,183 @@ test('upgraded combinations (Kerria, LightStar, Falling Blocks FPS Fix, Particle
   assert.ok(heavyEmiBuild.modIds.includes('emi-professions'));
   assert.equal(analyzeSelection(heavyEmiBuild.modIds).conflicts.length, 0);
 });
+
+test('evaluateDubiousMods classifies clean Sinytra Nvidium as low nuance while flagging mismatches, and buildSmartAssembly scales heavy balanced servers & shader builds', async () => {
+  const { evaluateDubiousMods } = await import('./modAnalyzer.ts');
+
+  const nvidiumPreset = MOD_PRESETS.find(p => p.id === 'user-nvidium-emberbium')!;
+  const cleanNvidiaPrefs: AssemblyPreferences = {
+    ...INITIAL_BUILDER_PREFS,
+    ...nvidiumPreset.recommendedPrefs,
+    gpu: 'nvidia',
+    useShaders: false,
+    allowSinytra: true,
+    portStrategy: 'hybrid',
+  };
+
+  const cleanDubious = evaluateDubiousMods(nvidiumPreset.modIds, undefined, cleanNvidiaPrefs);
+  const nvidiumCleanEntry = cleanDubious.find(d => d.modId === 'nvidium');
+  assert.ok(nvidiumCleanEntry, 'Expected Nvidium to appear as a nuance entry');
+  assert.equal(nvidiumCleanEntry.severity, 'low', 'Clean NVIDIA Sinytra Nvidium should be low nuance, not medium risky');
+
+  const nativeForgeDubious = evaluateDubiousMods(nvidiumPreset.modIds, undefined, {
+    ...cleanNvidiaPrefs,
+    allowSinytra: false,
+    portStrategy: 'native-forge',
+  });
+  assert.equal(nativeForgeDubious.find(d => d.modId === 'nvidium')?.severity, 'high');
+
+  const shaderMismatchDubious = evaluateDubiousMods(nvidiumPreset.modIds, undefined, {
+    ...cleanNvidiaPrefs,
+    useShaders: true,
+  });
+  assert.equal(shaderMismatchDubious.find(d => d.modId === 'nvidium')?.severity, 'high');
+
+  const heavyBalancedServer = buildSmartAssembly({
+    gpu: 'amd-intel',
+    mode: 'server',
+    goal: 'balanced',
+    packScale: 'heavy',
+    useShaders: false,
+    useCreate: false,
+    allowSinytra: false,
+    portStrategy: 'native-forge',
+    recipeViewer: 'jei',
+  });
+  for (const expectedId of [
+    'vmp-forge',
+    'alternate-current',
+    'entity-collision-optimization',
+    'stutterfix-reforged',
+    'threadtweak-reforged',
+  ]) {
+    assert.ok(heavyBalancedServer.modIds.includes(expectedId), `Expected heavy balanced server to include ${expectedId}`);
+  }
+  assert.equal(analyzeSelection(heavyBalancedServer.modIds).conflicts.length, 0);
+
+  const balancedShaders = buildSmartAssembly({
+    gpu: 'amd-intel',
+    mode: 'singleplayer',
+    goal: 'balanced',
+    packScale: 'medium',
+    useShaders: true,
+    useCreate: false,
+    allowSinytra: false,
+    portStrategy: 'native-forge',
+    recipeViewer: 'jei',
+  });
+  assert.ok(balancedShaders.modIds.includes('shadowlod'), 'Balanced shader build should include ShadowLOD');
+  assert.equal(analyzeSelection(balancedShaders.modIds).conflicts.length, 0);
+});
+
+test('toggleModSmart auto-pairs companion fixes (ALI+FastALI, DH+shaders+MemoryFix, C2ME+Extras/Radium, Calm+AllTheLeaks) cleanly', () => {
+  const aliRes = toggleModSmart(['embeddium', 'just-enough-items-jei'], 'advanced-loot-info-ali', { strict: true });
+  assert.ok(aliRes.nextIds.includes('fastali'));
+  assert.equal(analyzeSelection(aliRes.nextIds).warnings.length, 0);
+
+  const dhShaderRes = toggleModSmart(['embeddium', 'oculus'], 'distant-horizons', { strict: true });
+  assert.ok(dhShaderRes.nextIds.includes('distant-horizons-memory-fix-dh'));
+  assert.equal(analyzeSelection(dhShaderRes.nextIds).warnings.length, 0);
+
+  const shaderAfterDhRes = toggleModSmart(['emberbium', 'distant-horizons'], 'emberlens', { strict: true });
+  assert.ok(shaderAfterDhRes.nextIds.includes('distant-horizons-memory-fix-dh'));
+  assert.equal(analyzeSelection(shaderAfterDhRes.nextIds).warnings.length, 0);
+
+  const c2meRes = toggleModSmart(['canary', 'noisiumed'], 'c2me-concurrent-chunk-management-engine', { strict: true });
+  assert.ok(c2meRes.nextIds.includes('connector-extras'));
+  assert.ok(c2meRes.nextIds.includes('radium-re-reforged'));
+  assert.ok(!c2meRes.nextIds.includes('canary'));
+  assert.equal(analyzeSelection(c2meRes.nextIds).conflicts.length, 0);
+  assert.equal(analyzeSelection(c2meRes.nextIds).warnings.length, 0);
+
+  const calmRes = toggleModSmart(['modernfix'], 'calm-the-leaks', { strict: true });
+  assert.ok(calmRes.nextIds.includes('alltheleaks-memory-leak-fix'));
+  assert.equal(analyzeSelection(calmRes.nextIds).warnings.length, 0);
+
+  // Exhaustive single-mod strict toggle check: no safe Forge mod leaves conflicts or companion-fix warnings
+  for (const mod of MODS_DATABASE) {
+    if (mod.status === 'danger' || mod.coveredBy) continue;
+    const res = toggleModSmart([], mod.id, { strict: true });
+    const a = analyzeSelection(res.nextIds);
+    assert.equal(a.conflicts.length, 0, `Single toggle of ${mod.id} caused conflicts`);
+    assert.equal(
+      a.warnings.filter(w => w.fixModIds && w.fixModIds.length > 0).length,
+      0,
+      `Single toggle of ${mod.id} left unresolved fixModIds warnings`
+    );
+  }
+});
+
+test('relative impact and analog comparison accurately evaluate slot replacements, recipe ecosystems, and narrow fixes', async () => {
+  const { MOD_BY_ID, evaluateModImpactInPack, getModAnalogsComparison } = await import('./modAnalyzer.ts');
+  const defaultPack = new Set(buildSmartAssembly(INITIAL_BUILDER_PREFS).modIds);
+
+  // 1. Exclusive slot replacements are evaluated cleanly without conflicting against an existing peer (e.g. Emberbium)
+  const rubidiumImpact = evaluateModImpactInPack(MOD_BY_ID.get('rubidium')!, defaultPack, undefined, INITIAL_BUILDER_PREFS);
+  assert.ok(rubidiumImpact.betterAnalogId && rubidiumImpact.betterAnalogDeltaPoints && rubidiumImpact.betterAnalogDeltaPoints > 100);
+
+  const flatlightCmp = getModAnalogsComparison(MOD_BY_ID.get('flatlight-shading-cutter')!, defaultPack, INITIAL_BUILDER_PREFS);
+  const flatlightEmbeddium = flatlightCmp.find(e => e.mod.id === 'embeddium');
+  assert.ok(flatlightEmbeddium && flatlightEmbeddium.relation === 'better-replacement');
+  assert.ok(flatlightEmbeddium.points >= 80 && flatlightEmbeddium.relativeDeltaPoints > 50);
+
+  const alloyiumCmp = getModAnalogsComparison(MOD_BY_ID.get('alloyium')!, defaultPack, INITIAL_BUILDER_PREFS);
+  const alloyiumEmbeddium = alloyiumCmp.find(e => e.mod.id === 'embeddium');
+  assert.ok(alloyiumEmbeddium && alloyiumEmbeddium.points >= 80);
+
+  // Xenon solo recommends Embeddium cleanly (+45+ pts)
+  const xenonSolo = evaluateModImpactInPack(MOD_BY_ID.get('xenon')!, new Set(), undefined, INITIAL_BUILDER_PREFS);
+  assert.equal(xenonSolo.betterAnalogId, 'embeddium');
+  assert.ok((xenonSolo.betterAnalogDeltaPoints ?? 0) >= 40);
+
+  // 2. Narrow/complementary mods in non-exclusive groups never mis-recommend unrelated leaders
+  for (const [modId, forbiddenAnalog] of [
+    ['shadowlod', 'distant-horizons'],
+    ['ggtu', 'dynamic-fps'],
+    ['tom-s-simple-storage-performance-optimization', 'just-enough-items-jei'],
+    ['alltheleaks-fix-for-moonlight-2-13-4', 'modernfix'],
+    ['hp-hariplayer', 'ixeris'],
+  ] as const) {
+    const solo = evaluateModImpactInPack(MOD_BY_ID.get(modId)!, new Set(), undefined, INITIAL_BUILDER_PREFS);
+    assert.notEqual(solo.betterAnalogId, forbiddenAnalog, `${modId} should not suggest unrelated ${forbiddenAnalog}`);
+  }
+  const ggtuSolo = evaluateModImpactInPack(MOD_BY_ID.get('ggtu')!, new Set(), undefined, INITIAL_BUILDER_PREFS);
+  assert.equal(ggtuSolo.betterAnalogId, 'amd-fsr-upscaler-render-scale-for-embeddium');
+
+  const shadowSolo = evaluateModImpactInPack(MOD_BY_ID.get('shadowlod')!, new Set(), undefined, INITIAL_BUILDER_PREFS);
+  assert.equal(shadowSolo.label, 'Нужна зависимость');
+  assert.equal(shadowSolo.coUsageVerdict, 'dependency');
+
+  // 3. Recipe-viewer awareness: JER in JEI mode does not flag emi-loot as better-replacement
+  const jerJeiCmp = getModAnalogsComparison(MOD_BY_ID.get('just-enough-resources-jer')!, defaultPack, {
+    ...INITIAL_BUILDER_PREFS,
+    recipeViewer: 'jei',
+  });
+  const emiLootInJei = jerJeiCmp.find(e => e.mod.id === 'emi-loot');
+  assert.ok(emiLootInJei && emiLootInJei.relation !== 'better-replacement');
+
+  // 4. Recommended non-conditional mods & networking leader hierarchy
+  const fastSounds = evaluateModImpactInPack(MOD_BY_ID.get('fast-sounds')!, new Set(), undefined, INITIAL_BUILDER_PREFS);
+  const smoothBoot = evaluateModImpactInPack(MOD_BY_ID.get('smooth-boot-reloaded')!, new Set(), undefined, INITIAL_BUILDER_PREFS);
+  assert.equal(fastSounds.level, 'high');
+  assert.equal(smoothBoot.level, 'high');
+
+  const kryptonReno = evaluateModImpactInPack(MOD_BY_ID.get('krypton-reno')!, new Set(), undefined, INITIAL_BUILDER_PREFS);
+  const c2sFilter = evaluateModImpactInPack(MOD_BY_ID.get('c2s-log-filter')!, new Set(), undefined, INITIAL_BUILDER_PREFS);
+  assert.ok(kryptonReno.impactPoints > c2sFilter.impactPoints);
+
+  // 5. Full sweep: no valid non-diagnostic better-replacement entry produces negative/zero delta in default pack
+  for (const mod of MODS_DATABASE) {
+    if (mod.status === 'danger' || mod.status === 'diagnostic') continue;
+    const cmp = getModAnalogsComparison(mod, defaultPack, INITIAL_BUILDER_PREFS);
+    for (const entry of cmp) {
+      if (entry.relation === 'better-replacement') {
+        assert.ok(
+          entry.relativeDeltaPoints > 0,
+          `${mod.id} -> ${entry.mod.id} had non-positive better-replacement delta (${entry.relativeDeltaPoints})`
+        );
+      }
+    }
+  }
+});
+

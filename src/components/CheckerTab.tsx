@@ -14,6 +14,7 @@ import {
   getModEffectivenessScore,
   getModRestrictionBadge,
   getRecipeBridgeStatus,
+  getRuleConflictingIds,
   organizeAssemblyTree,
   removeModsCascade,
   shouldHideMod,
@@ -27,6 +28,7 @@ import {
 import { estimateFpsRange } from '../utils/fpsEstimator.ts';
 import {
   addMissingDependenciesForMod,
+  applyWarningFix,
   getMissingDependenciesForMod,
 } from '../utils/modInteractions.ts';
 import { AssemblyDetailModal, type AnalyzedAssemblyModRow } from './AssemblyDetailModal.tsx';
@@ -688,7 +690,7 @@ export function CheckerTab({ checkedModIds, setCheckedModIds, prefs, onOpenDetai
                     </div>
                     <button
                       type="button"
-                      onClick={() => setCheckedModIds(prev => prev.filter(id => !loserIds.includes(id)))}
+                      onClick={() => setCheckedModIds(prev => removeModsCascade(prev, loserIds).nextIds)}
                       className="shrink-0 px-2.5 py-1 rounded-[4px] bg-[#3ddc84] hover:bg-[#34c776] text-[#121417] text-[11px] font-semibold transition-colors duration-150 whitespace-nowrap"
                     >
                       {canKeepWinner ? `Оставить ${winnerMod!.name}` : 'Убрать конфликтные'}
@@ -706,7 +708,7 @@ export function CheckerTab({ checkedModIds, setCheckedModIds, prefs, onOpenDetai
                   <button
                     type="button"
                     onClick={() =>
-                      setCheckedModIds(prev => Array.from(new Set([...prev, ...w.fixModIds!])))
+                      setCheckedModIds(prev => applyWarningFix(prev, w.fixModIds!, effectivePrefs).nextIds)
                     }
                     className="shrink-0 px-2.5 py-1 rounded-[4px] bg-[#3ddc84] hover:bg-[#34c776] text-[#121417] font-semibold"
                   >
@@ -715,22 +717,28 @@ export function CheckerTab({ checkedModIds, setCheckedModIds, prefs, onOpenDetai
                 )}
               </div>
             ))}
-            {yellowWarnings.map((w, idx) => (
-              <div key={`yw-${idx}`} className="bg-[#e5a93c]/[0.05] border border-[#e5a93c]/30 rounded-[4px] p-3 text-xs flex items-center justify-between gap-3">
-                <span className="text-[#e5a93c]">{w.message}</span>
-                {w.fixModIds && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCheckedModIds(prev => Array.from(new Set([...prev, ...w.fixModIds!])))
-                    }
-                    className="shrink-0 px-2.5 py-1 rounded-[4px] bg-[#121417] hover:bg-[#22262b] border border-[#2a2e33] text-[#e6e8ea] font-medium"
-                  >
-                    Добавить базу
-                  </button>
-                )}
-              </div>
-            ))}
+            {yellowWarnings.map((w, idx) => {
+              const isReplacementFix = Boolean(
+                w.fixModIds &&
+                  getRuleConflictingIds(w.modId).some(cid => w.fixModIds!.includes(cid))
+              );
+              return (
+                <div key={`yw-${idx}`} className="bg-[#e5a93c]/[0.05] border border-[#e5a93c]/30 rounded-[4px] p-3 text-xs flex items-center justify-between gap-3">
+                  <span className="text-[#e5a93c]">{w.message}</span>
+                  {w.fixModIds && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCheckedModIds(prev => applyWarningFix(prev, w.fixModIds!, effectivePrefs).nextIds)
+                      }
+                      className="shrink-0 px-2.5 py-1 rounded-[4px] bg-[#121417] hover:bg-[#22262b] border border-[#2a2e33] text-[#e6e8ea] font-medium"
+                    >
+                      {isReplacementFix ? 'Заменить на аналог' : 'Добавить базу'}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -811,13 +819,17 @@ export function CheckerTab({ checkedModIds, setCheckedModIds, prefs, onOpenDetai
                   type="button"
                   onClick={() => setShowDubiousModal(true)}
                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] border text-xs font-semibold transition-colors duration-150 whitespace-nowrap tabular-nums ${
-                    dubiousCount > 0
+                    impactSummary.dubiousMods.some(d => d.severity === 'high' || d.severity === 'medium')
                       ? 'bg-[#e5a93c]/[0.08] border-[#e5a93c]/40 text-[#e5a93c]'
                       : 'bg-[#121417] border-[#2a2e33] text-[#8b9199] hover:text-[#e6e8ea]'
                   }`}
                 >
                   <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
-                  Сомнительные моды ({dubiousCount})
+                  {dubiousCount === 0
+                    ? 'Сомнительные моды (0)'
+                    : impactSummary.dubiousMods.some(d => d.severity === 'high' || d.severity === 'medium')
+                      ? `Сомнительные моды (${dubiousCount})`
+                      : `Нюансы (${dubiousCount})`}
                 </button>
               </div>
             </div>

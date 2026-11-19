@@ -7,6 +7,8 @@ import {
   analyzeSelection,
   getDirectDependencies,
   getRuleConflictingIds,
+  getTransitiveDependencies,
+  isUnsupportedOnForge,
   summarizeAssemblyImpact,
 } from './modAnalyzer.ts';
 import { toggleModSmart } from './modBuilder.ts';
@@ -159,6 +161,82 @@ export function addMissingDependenciesForMod(
     }
   }
   return { nextIds, addedNames };
+}
+
+export function applyWarningFix(
+  selectedIds: string[],
+  fixModIds: string[],
+  prefs?: AssemblyPreferences
+): { nextIds: string[]; addedNames: string[]; removedNames: string[] } {
+  if (fixModIds.length === 0) {
+    return { nextIds: selectedIds, addedNames: [], removedNames: [] };
+  }
+  const prevSet = new Set(selectedIds);
+  let nextIds = [...selectedIds];
+  for (const fid of fixModIds) {
+    if (!nextIds.includes(fid)) {
+      nextIds = toggleModSmart(nextIds, fid, { strict: true, prefs }).nextIds;
+    }
+  }
+  const nextSet = new Set(nextIds);
+  const addedNames = nextIds
+    .filter(id => !prevSet.has(id))
+    .map(id => MOD_BY_ID.get(id)?.name || id);
+  const removedNames = selectedIds
+    .filter(id => !nextSet.has(id))
+    .map(id => MOD_BY_ID.get(id)?.name || id);
+  return { nextIds, addedNames, removedNames };
+}
+
+export function getCompatibleAddonsForMod(mod: ModItem, addons: ModItem[]): ModItem[] {
+  const modConflicts = new Set(getRuleConflictingIds(mod.id));
+  const modDepConflicts = new Set<string>();
+  for (const depId of getTransitiveDependencies(mod.id)) {
+    for (const cid of getRuleConflictingIds(depId)) {
+      modDepConflicts.add(cid);
+    }
+  }
+  const modPool = Object.values(EXCLUSIVE_ENGINE_POOLS).find(pool => pool.includes(mod.id));
+  const modPoolSet = modPool ? new Set(modPool) : null;
+  const modContext = new Set<string>([mod.id, ...getTransitiveDependencies(mod.id)]);
+
+  return addons.filter(addon => {
+    if (addon.id === mod.id) return false;
+    if (isUnsupportedOnForge(addon)) return false;
+    if (modConflicts.has(addon.id) || getRuleConflictingIds(addon.id).includes(mod.id)) return false;
+    if (modDepConflicts.has(addon.id)) return false;
+    if (modPoolSet && modPoolSet.has(addon.id)) return false;
+
+    const addonDeps = getTransitiveDependencies(addon.id, new Set(), modContext);
+    if (addonDeps.some(dep => modConflicts.has(dep) || modDepConflicts.has(dep))) {
+      return false;
+    }
+
+    if (mod.id === 'just-enough-items-jei' || mod.recipeEcosystem === 'jei-engine') {
+      if (
+        addon.id === 'emi' ||
+        addon.id === 'tmrv-updated' ||
+        addon.recipeEcosystem === 'emi-only' ||
+        addon.recipeEcosystem === 'tmrv-bridge'
+      ) {
+        return false;
+      }
+    } else if (mod.id === 'emi' || mod.recipeEcosystem === 'emi-only') {
+      if (addon.id === 'just-enough-items-jei' || addon.recipeEcosystem === 'jei-engine') {
+        return false;
+      }
+    } else if (mod.id === 'tmrv-updated') {
+      if (
+        addon.id === 'just-enough-items-jei' ||
+        addon.recipeEcosystem === 'jei-engine' ||
+        addon.recipeEcosystem === 'emi-only'
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 }
 
 export function replaceConflictingWithMod(

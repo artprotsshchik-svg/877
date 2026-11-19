@@ -19,6 +19,7 @@ import {
   type AssemblyPreferences,
   type CoUsageVerdict,
 } from '../utils/modLogic.ts';
+import { getCompatibleAddonsForMod } from '../utils/modInteractions.ts';
 import {
   ExternalLink,
   X,
@@ -70,6 +71,11 @@ export function ModDetailModal({
     if (!mod?.groupId) return null;
     return getGroupMembersByRole(mod.groupId);
   }, [mod]);
+
+  const compatibleGroupAddons = useMemo(() => {
+    if (!mod || !groupInfo) return [];
+    return getCompatibleAddonsForMod(mod, groupInfo.addons);
+  }, [mod, groupInfo]);
 
   const dualPair = useMemo(() => {
     if (!mod) return null;
@@ -246,16 +252,23 @@ export function ModDetailModal({
               </button>
             )}
 
-            {groupInfo?.leader && groupInfo.leader.id !== mod.id && (
-              <button
-                type="button"
-                onClick={() => onSelectMod(groupInfo.leader!)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[6px] text-xs font-semibold bg-[#121417] border border-[#2a2e33] text-[#8b9199] hover:text-[#e6e8ea] hover:bg-[#22262b] transition-colors duration-150 whitespace-nowrap"
-              >
-                Лидер: {groupInfo.leader.name}
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            )}
+            {groupInfo?.leader &&
+              groupInfo.leader.id !== mod.id &&
+              (groupInfo.group.exclusive ||
+                groupInfo.addonIds.includes(mod.id) ||
+                mod.status === 'outdated' ||
+                mod.status === 'redundant' ||
+                mod.status === 'danger' ||
+                mod.supersededBy?.includes(groupInfo.leader.id)) && (
+                <button
+                  type="button"
+                  onClick={() => onSelectMod(groupInfo.leader!)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[6px] text-xs font-semibold bg-[#121417] border border-[#2a2e33] text-[#8b9199] hover:text-[#e6e8ea] hover:bg-[#22262b] transition-colors duration-150 whitespace-nowrap"
+                >
+                  Лидер: {groupInfo.leader.name}
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )}
           </div>
 
           {/* Description & Key Verdicts */}
@@ -505,7 +518,7 @@ export function ModDetailModal({
                         className={`px-3 py-2 text-[11px] leading-snug ${
                           inter.kind === 'conflict'
                             ? 'text-[#e55353]'
-                            : inter.kind === 'overlap'
+                            : inter.kind === 'overlap' || (inter.kind === 'dependency' && inter.summary.includes('требует'))
                               ? 'text-[#e5a93c]'
                               : inter.kind === 'synergy'
                                 ? 'text-[#3ddc84]'
@@ -608,16 +621,16 @@ export function ModDetailModal({
           )}
 
           {/* Compatible Group Addons */}
-          {groupInfo && groupInfo.addons.length > 0 && (
+          {groupInfo && compatibleGroupAddons.length > 0 && (
             <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold text-[#e6e8ea]">
-                  Совместимые аддоны и дополнения ({groupInfo.addons.length})
+                  Совместимые аддоны и дополнения ({compatibleGroupAddons.length})
                 </h3>
-                <span className="text-[11px] text-[#8b9199]">Дополняют лидера, не заменяя его</span>
+                <span className="text-[11px] text-[#8b9199]">Совместимы с {mod.name}, не заменяя его</span>
               </div>
               <div className="divide-y divide-[#2a2e33] border border-[#2a2e33] rounded-[6px] overflow-hidden bg-[#121417]">
-                {groupInfo.addons.map(addon => {
+                {compatibleGroupAddons.map(addon => {
                   const addonTier = getBaseHealthTier(addon);
                   const statusTone =
                     addonTier === 'red'

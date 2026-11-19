@@ -2926,7 +2926,6 @@
     "isGroupAddon": false,
     "addons": [
       "nvidium",
-      "voxy",
       "revidium-accedium",
       "distant-horizons-memory-fix-dh"
     ],

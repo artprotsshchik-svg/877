@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ArrowRightLeft,
   CheckCircle2,
+  Info,
   Trash2,
   X,
 } from 'lucide-react';
@@ -103,13 +104,15 @@ export function DubiousModsModal({
     };
   };
 
+  const onlyNuances = counts.total > 0 && counts.high === 0 && counts.medium === 0;
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label="Сомнительные моды в сборке"
+      aria-label={onlyNuances ? 'Нюансы сборки' : 'Сомнительные моды в сборке'}
     >
       <div
         className="w-full max-w-2xl bg-[#1a1d21] border border-[#2a2e33] rounded-[6px] overflow-hidden flex flex-col max-h-[85vh]"
@@ -120,8 +123,14 @@ export function DubiousModsModal({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <h2 className="text-base font-semibold text-[#e6e8ea] flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-[#e5a93c] shrink-0" />
-                Сомнительные моды ({counts.total})
+                {onlyNuances ? (
+                  <Info className="w-4 h-4 text-[#8b9199] shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 text-[#e5a93c] shrink-0" />
+                )}
+                {onlyNuances
+                  ? `Нюансы сборки (${counts.total})`
+                  : `Сомнительные моды (${counts.total})`}
               </h2>
               <span className="text-xs font-mono tabular-nums text-[#8b9199]">
                 из {totalModsCount} в сборке
@@ -132,7 +141,10 @@ export function DubiousModsModal({
               <strong className={`font-mono ${riskToneCls}`}>
                 {artifactRisk.chancePct}% · {artifactRisk.label}
               </strong>
-              {counts.total > 0 && ' — удаление или замена позиций ниже снижает риск глитчей.'}
+              {counts.total > 0 &&
+                (onlyNuances
+                  ? ' — информационные особенности связки; критичных конфликтов нет.'
+                  : ' — удаление или замена позиций ниже снижает риск глитчей.')}
             </p>
           </div>
           <button

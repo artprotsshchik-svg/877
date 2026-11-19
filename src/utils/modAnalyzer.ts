@@ -35,6 +35,14 @@ export function normalizeSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+const MOD_SLUG_BY_ID = new Map<string, string>(MODS_DATABASE.map(m => [m.id, normalizeSlug(m.name)]));
+const GROUP_MEMBER_SETS = new Map<string, Set<string>>(MOD_GROUPS.map(g => [g.id, new Set(g.memberIds)]));
+const PRECOMPUTED_RULES = INCOMPATIBILITY_RULES.map(rule => ({
+  rule,
+  slugs: rule.conflictingMods.map(normalizeSlug),
+  slugSet: new Set(rule.conflictingMods.map(normalizeSlug)),
+}));
+
 export function isUnsupportedOnForge(mod: ModItem): boolean {
   return (
     mod.platform.includes('Несовм.') ||
@@ -505,13 +513,13 @@ export function analyzeSelection(selectedIds: string[]) {
   const conflicts: ConflictDetection[] = [];
   const conflictingIdSet = new Set<string>();
 
-  for (const rule of INCOMPATIBILITY_RULES) {
+  for (const { rule, slugSet } of PRECOMPUTED_RULES) {
     if (rule.title.includes('OptiFine')) {
-      const opti = selectedMods.find(m => normalizeSlug(m.name) === 'optifine');
+      const opti = selectedMods.find(m => MOD_SLUG_BY_ID.get(m.id) === 'optifine');
       if (!opti) continue;
       const others = selectedMods.filter(m => {
-        const n = normalizeSlug(m.name);
-        return n !== 'optifine' && rule.conflictingMods.some(cm => normalizeSlug(cm) === n);
+        const n = MOD_SLUG_BY_ID.get(m.id) || '';
+        return n !== 'optifine' && slugSet.has(n);
       });
       if (others.length > 0) {
         const matched = [opti, ...others];
@@ -529,7 +537,7 @@ export function analyzeSelection(selectedIds: string[]) {
       const nvidMods = selectedMods.filter(m => NVIDIUM_FAMILY_IDS.has(m.id));
       if (nvidMods.length === 0) continue;
       const others = selectedMods.filter(
-        m => !NVIDIUM_FAMILY_IDS.has(m.id) && rule.conflictingMods.some(cm => normalizeSlug(cm) === normalizeSlug(m.name))
+        m => !NVIDIUM_FAMILY_IDS.has(m.id) && slugSet.has(MOD_SLUG_BY_ID.get(m.id) || '')
       );
       if (others.length > 0) {
         const matched = [...nvidMods, ...others];
@@ -544,9 +552,7 @@ export function analyzeSelection(selectedIds: string[]) {
     }
 
     if (rule.title.includes('Nvidium ↔ Alloyium')) {
-      const matched = selectedMods.filter(sm =>
-        rule.conflictingMods.some(cm => normalizeSlug(cm) === normalizeSlug(sm.name))
-      );
+      const matched = selectedMods.filter(sm => slugSet.has(MOD_SLUG_BY_ID.get(sm.id) || ''));
       const hasNonNvidium = matched.some(m => !NVIDIUM_FAMILY_IDS.has(m.id));
       const distinctConflictGroups = new Set(matched.map(m => (NVIDIUM_FAMILY_IDS.has(m.id) ? 'nvidium-family' : m.id)));
       if (distinctConflictGroups.size > 1 && (hasNonNvidium || matched.length > 1)) {
@@ -564,7 +570,7 @@ export function analyzeSelection(selectedIds: string[]) {
       const ember = selectedMods.find(m => m.id === 'emberbium');
       if (!ember) continue;
       const others = selectedMods.filter(
-        m => m.id !== 'emberbium' && rule.conflictingMods.some(cm => normalizeSlug(cm) === normalizeSlug(m.name))
+        m => m.id !== 'emberbium' && slugSet.has(MOD_SLUG_BY_ID.get(m.id) || '')
       );
       if (others.length > 0) {
         const matched = [ember, ...others];
@@ -582,7 +588,7 @@ export function analyzeSelection(selectedIds: string[]) {
       const acedium = selectedMods.find(m => m.id === 'revidium-accedium');
       if (!acedium) continue;
       const others = selectedMods.filter(
-        m => m.id !== 'revidium-accedium' && rule.conflictingMods.some(cm => normalizeSlug(cm) === normalizeSlug(m.name))
+        m => m.id !== 'revidium-accedium' && slugSet.has(MOD_SLUG_BY_ID.get(m.id) || '')
       );
       if (others.length > 0) {
         const matched = [acedium, ...others];
@@ -600,7 +606,7 @@ export function analyzeSelection(selectedIds: string[]) {
       const xenon = selectedMods.find(m => m.id === 'xenon');
       if (!xenon) continue;
       const others = selectedMods.filter(
-        m => m.id !== 'xenon' && rule.conflictingMods.some(cm => normalizeSlug(cm) === normalizeSlug(m.name))
+        m => m.id !== 'xenon' && slugSet.has(MOD_SLUG_BY_ID.get(m.id) || '')
       );
       if (others.length > 0) {
         const matched = [xenon, ...others];
@@ -614,9 +620,7 @@ export function analyzeSelection(selectedIds: string[]) {
       continue;
     }
 
-    const matched = selectedMods.filter(sm =>
-      rule.conflictingMods.some(cm => normalizeSlug(cm) === normalizeSlug(sm.name))
-    );
+    const matched = selectedMods.filter(sm => slugSet.has(MOD_SLUG_BY_ID.get(sm.id) || ''));
     if (matched.length > 1) {
       matched.forEach(m => conflictingIdSet.add(m.id));
       conflicts.push({
@@ -1383,7 +1387,9 @@ const HIGH_SYNERGY_IDS = new Set([
   'stutterfix-reforged',
   'threadtweak-reforged',
   'falling-blocks-fps-fix',
+  'fast-sounds',
   'reload-looping-sound-fix',
+  'smooth-boot-reloaded',
   'fast-item-frames',
   'structure-layout-optimizer',
   'lightspeedre',
@@ -1402,6 +1408,7 @@ const NETWORK_MULTIPLAYER_IDS = new Set([
   'pluto',
   'servercore',
   'connectivity',
+  'connectivity-fix',
   'vmp-forge',
   'very-many-players-vmp',
   'fast-ip-ping',
@@ -1411,11 +1418,13 @@ const NETWORK_MULTIPLAYER_IDS = new Set([
   'hp-hariplayer',
   'tcp-nodeway',
   'client-mixin-intercept',
+  'c2s-log-filter',
 ]);
 
 const CONTENT_FIX_IDS = new Set([
   'qnm-quark',
   'alltheleaks-fix-for-moonlight-2-13-4',
+  'nullpointer-fix-for-mio',
   'thirst-was-taken-mixin-server-fix-thirst-was-taken',
   'unofficial-luxium-compatibility-luxium-oculus',
   'embeddium-x-polytone-block-colormap-fix-polytone',
@@ -3165,6 +3174,24 @@ export function evaluateDubiousMods(
           : SINYTRA_BRIDGE_IDS.has(mod.id)
             ? 'Прослойка Sinytra подключена впустую (нет ни одного Fabric-мода в сборке).'
             : 'Библиотека или узкий аддон без активного потребителя (0% пользы).';
+    } else if (mod.id === 'embeddium-extras' && selectedSet.has('sodium-chloride')) {
+      severity = 'medium';
+      reason = 'Частично дублирует функции (Sodium) Chloride — лучше оставить один аддон меню.';
+    } else if (
+      mod.platform.includes('Sinytra') &&
+      (prefs?.allowSinytra === false || prefs?.portStrategy === 'native-forge')
+    ) {
+      severity = 'medium';
+      reason = 'Мод работает через Sinytra Connector, но в профиле выбран чистый нативный Forge.';
+    } else if (
+      mod.platform.includes('Sinytra') &&
+      warnings.length === 0 &&
+      mod.status !== 'outdated' &&
+      mod.status !== 'redundant' &&
+      !(mod.supersededBy && mod.supersededBy.length > 0)
+    ) {
+      severity = 'low';
+      reason = 'Запускается через мост Sinytra Connector (Fabric → Forge): повышает поверхность миксинов и риск артефактов.';
     } else if (tierInfo.tier === 'yellow' || warnings.length > 0) {
       severity = 'medium';
       reason =
@@ -3172,12 +3199,6 @@ export function evaluateDubiousMods(
         mod.warning ||
         mod.bestAlternative ||
         'Условный, устаревший или требующий точной настройки мод.';
-    } else if (mod.id === 'embeddium-extras' && selectedSet.has('sodium-chloride')) {
-      severity = 'medium';
-      reason = 'Частично дублирует функции (Sodium) Chloride — лучше оставить один аддон меню.';
-    } else if (mod.platform.includes('Sinytra')) {
-      severity = 'low';
-      reason = 'Запускается через мост Sinytra Connector (Fabric → Forge): повышает поверхность миксинов и риск артефактов.';
     } else if (
       mod.id === 'accelerated-rendering' ||
       mod.id === 'accelerated-rendering-turned' ||
@@ -3385,8 +3406,8 @@ function computePackScoreInternal(
       }
 
       const grpCovered = sub.groupIds.some(gid => {
-        const grp = MOD_GROUPS.find(g => g.id === gid);
-        return grp ? grp.memberIds.includes(m.id) && !redModIds.has(m.id) : false;
+        const members = GROUP_MEMBER_SETS.get(gid);
+        return members ? members.has(m.id) && !redModIds.has(m.id) : false;
       });
       if (grpCovered) covered = true;
     }
@@ -3532,6 +3553,64 @@ function computePackScoreInternal(
   };
 }
 
+function findExclusivePoolPeers(modId: string): string[] {
+  const peers = new Set<string>();
+  for (const pool of Object.values(EXCLUSIVE_ENGINE_POOLS)) {
+    if (pool.includes(modId)) {
+      for (const pid of pool) {
+        if (pid !== modId) peers.add(pid);
+      }
+    }
+  }
+  return Array.from(peers);
+}
+
+function buildReplacementEvalSet(
+  candidate: ModItem,
+  baseSet: Set<string>,
+  prefs?: AssemblyPreferences
+): Set<string> {
+  if (isUnsupportedOnForge(candidate) || candidate.status === 'danger') {
+    return new Set(baseSet);
+  }
+  if (prefs && !getRecipeBridgeStatus(candidate, baseSet, prefs).compatible) {
+    return new Set(baseSet);
+  }
+
+  const next = new Set(baseSet);
+  const directConflicts = new Set<string>([
+    ...getRuleConflictingIds(candidate.id),
+    ...findExclusivePoolPeers(candidate.id),
+  ]);
+
+  let removedEmberbium = false;
+  let removedEmbeddium = false;
+  for (const id of Array.from(next)) {
+    if (directConflicts.has(id) || getRuleConflictingIds(id).includes(candidate.id)) {
+      next.delete(id);
+      if (id === 'emberbium') removedEmberbium = true;
+      if (id === 'embeddium') removedEmbeddium = true;
+    }
+  }
+
+  const hardDeps = MOD_HARD_DEPENDENCIES[candidate.id] || [];
+  if (hardDeps.includes('embeddium') && removedEmberbium && !next.has('embeddium')) {
+    next.add('embeddium');
+    // Also clean any Emberbium-specific peer (e.g. Emberlens) if Embeddium is swapped in
+    if (next.has('emberlens') && candidate.id !== 'emberlens') {
+      next.delete('emberlens');
+    }
+  }
+  if (hardDeps.includes('emberbium') && removedEmbeddium && !next.has('emberbium')) {
+    next.add('emberbium');
+    if (next.has('oculus') && candidate.id !== 'oculus') {
+      next.delete('oculus');
+    }
+  }
+
+  return next;
+}
+
 function getPreferredBetterAnalog(mod: ModItem, selectedSet: Set<string>, prefs?: AssemblyPreferences): ModItem | null {
   const candidates: ModItem[] = [];
   if (mod.supersededBy) {
@@ -3552,28 +3631,60 @@ function getPreferredBetterAnalog(mod: ModItem, selectedSet: Set<string>, prefs?
   }
   const dual = getDualPortPairForMod(mod.id);
   if (dual && dual.forgeModId !== mod.id) {
-    const forgeCounterpart = MOD_BY_ID.get(dual.forgeModId);
-    if (forgeCounterpart && !isUnsupportedOnForge(forgeCounterpart)) candidates.push(forgeCounterpart);
+    const nvidiumBlockedByPrefs =
+      mod.id === 'nvidium' &&
+      Boolean(prefs && (!prefs.allowSinytra || prefs.gpu !== 'nvidia' || prefs.useShaders));
+    if (mod.id !== 'nvidium' || nvidiumBlockedByPrefs) {
+      const forgeCounterpart = MOD_BY_ID.get(dual.forgeModId);
+      if (forgeCounterpart && !isUnsupportedOnForge(forgeCounterpart)) candidates.push(forgeCounterpart);
+    }
   }
+
+  // Same exclusive sub-pool peers (e.g. render-upscalers -> AMD FSR, mob-despawn -> Let Me Despawn)
+  const exclusivePoolPeers = findExclusivePoolPeers(mod.id);
+  for (const pid of exclusivePoolPeers) {
+    const pm = MOD_BY_ID.get(pid);
+    if (pm && !isUnsupportedOnForge(pm) && pm.status !== 'danger' && getModEffectivenessScore(pm) > getModEffectivenessScore(mod)) {
+      candidates.push(pm);
+    }
+  }
+
+  // Only suggest group leader for exclusive slots, direct conflicts, or outdated/redundant/danger entries
   if (mod.groupId) {
     const grp = MOD_GROUPS.find(g => g.id === mod.groupId);
-    if (grp && grp.leaderId !== mod.id && !grp.addonIds.includes(mod.id)) {
+    const modConflictsLeader = grp ? getRuleConflictingIds(mod.id).includes(grp.leaderId) : false;
+    const isReplacementCandidate =
+      Boolean(grp?.exclusive) ||
+      modConflictsLeader ||
+      mod.status === 'outdated' ||
+      mod.status === 'redundant' ||
+      mod.status === 'danger';
+    if (grp && grp.leaderId !== mod.id && !grp.addonIds.includes(mod.id) && isReplacementCandidate) {
       const leader = MOD_BY_ID.get(grp.leaderId);
       if (leader && leader.id !== mod.id) candidates.push(leader);
     }
   }
-  if (mod.id === 'geckolib-animation-optimizer') {
+
+  if (mod.id === 'geckolib-animation-optimizer' && selectedSet.has('geckolib')) {
     const better = MOD_BY_ID.get('geckolibbetterfps');
     if (better) candidates.push(better);
   }
 
+  // Respect Emberbium <-> Oculus/Emberlens pairing when one render core is already chosen in the pack
   const valid = candidates.filter(c => {
     if (c.id === mod.id) return false;
     if (prefs && !getRecipeBridgeStatus(c, selectedSet, prefs).compatible) return false;
+    if (mod.id === 'emberlens' && c.id === 'oculus' && selectedSet.has('emberbium')) return false;
+    if (mod.id === 'oculus' && c.id === 'emberlens' && selectedSet.has('embeddium')) return false;
     return true;
   });
   if (valid.length === 0) return null;
-  valid.sort((a, b) => getModEffectivenessScore(b) - getModEffectivenessScore(a));
+  valid.sort((a, b) => {
+    const aActive = selectedSet.has(a.id) ? 1 : 0;
+    const bActive = selectedSet.has(b.id) ? 1 : 0;
+    if (aActive !== bActive) return bActive - aActive;
+    return getModEffectivenessScore(b) - getModEffectivenessScore(a);
+  });
   return valid[0];
 }
 
@@ -3624,8 +3735,9 @@ export function evaluateModImpactInPack(
   const modWarnings = analysis.warnings.filter(w => w.modId === mod.id);
   for (const w of modWarnings) {
     const isRed = w.severity === 'red';
+    const isMissingDepWarning = !isRed && ((w.fixModIds && w.fixModIds.length > 0) || w.message.includes('требует'));
     interactions.push({
-      kind: isRed ? 'conflict' : 'overlap',
+      kind: isRed ? 'conflict' : isMissingDepWarning ? 'dependency' : 'overlap',
       targetIds: w.fixModIds || [],
       targetNames: (w.fixModIds || []).map(id => MOD_BY_ID.get(id)?.name || id),
       summary: w.message,
@@ -3908,7 +4020,9 @@ export function evaluateModImpactInPack(
     summary = 'Находит источник лагов (TPS/FPS/GC), прямой производительности не добавляет';
   } else if (modWarnings.some(w => w.severity === 'yellow') || interactions.some(i => i.kind === 'overlap')) {
     level = 'conditional';
-    label = 'Снижен / пересечение';
+    const hasOverlap = interactions.some(i => i.kind === 'overlap');
+    const yellowMsg = modWarnings.find(w => w.severity === 'yellow')?.message || '';
+    label = !hasOverlap && yellowMsg.includes('требует') ? 'Нужна зависимость' : 'Снижен / пересечение';
     summary = interactions.find(i => i.kind === 'overlap')?.summary || modWarnings[0]?.message || mod.warning || mod.description;
   } else if (
     CONTENT_FIX_IDS.has(mod.id) ||
@@ -3929,7 +4043,7 @@ export function evaluateModImpactInPack(
     level = 'conditional';
     label = NETWORK_MULTIPLAYER_IDS.has(mod.id) ? 'Только онлайн/сервер' : 'Зависит от ПК/сборки';
     summary = interactions.find(i => i.kind === 'context')?.summary || mod.bestAlternative || mod.description;
-  } else if (mod.status === 'useful' && mod.healthTier !== 'red') {
+  } else if ((mod.status === 'recommended' || mod.status === 'useful') && mod.healthTier !== 'red') {
     level = 'medium';
     label = 'Умеренный буст';
     summary = interactions[0]?.summary || mod.bestAlternative || mod.description;
@@ -3977,18 +4091,25 @@ export function evaluateModImpactInPack(
       impactPoints = 15;
       relativeImpactPct = 0;
     } else if (level === 'conditional' && NETWORK_MULTIPLAYER_IDS.has(mod.id) && prefs?.mode === 'singleplayer') {
-      impactPoints = Math.min(impactPoints, 22);
+      const cap = mod.id === 'krypton-reno' ? 28 : mod.status === 'outdated' ? 10 : 20;
+      impactPoints = Math.min(impactPoints, cap);
       relativeImpactPct = Math.min(relativeImpactPct, 1);
     }
   }
 
+  const hasMissingDepYellow = modWarnings.some(
+    w => w.severity === 'yellow' && ((w.fixModIds && w.fixModIds.length > 0) || w.message.includes('требует'))
+  );
+  const hasRealOverlap = interactions.some(i => i.kind === 'overlap') || modWarnings.some(
+    w => w.severity === 'yellow' && !(w.fixModIds && w.fixModIds.length > 0) && !w.message.includes('требует')
+  );
   const coUsageVerdict: CoUsageVerdict = isRed
     ? 'conflict'
     : level === 'zero'
       ? 'redundant'
-      : modWarnings.some(w => w.severity === 'yellow') || interactions.some(i => i.kind === 'overlap')
+      : hasRealOverlap
         ? 'overlap'
-        : activeLibConsumers.length > 0 && isLibrary
+        : hasMissingDepYellow || (activeLibConsumers.length > 0 && isLibrary)
           ? 'dependency'
           : interactions.some(i => i.kind === 'synergy')
             ? 'synergy'
@@ -3998,12 +4119,27 @@ export function evaluateModImpactInPack(
   let betterAnalogName: string | undefined;
   let betterAnalogDeltaPoints: number | undefined;
   const candidateAnalog = getPreferredBetterAnalog(mod, withoutSet, prefs);
-  if (candidateAnalog && (level === 'negative' || level === 'zero' || level === 'conditional' || mod.status === 'outdated' || mod.status === 'redundant')) {
+  const inExclusiveGroup = Boolean(mod.groupId && MOD_GROUPS.find(g => g.id === mod.groupId)?.exclusive);
+  const inExclusivePool = findExclusivePoolPeers(mod.id).length > 0;
+  const allowMediumUpgrade =
+    (inExclusiveGroup || inExclusivePool) &&
+    mod.id !== 'emberbium' &&
+    mod.status !== 'recommended';
+  if (
+    candidateAnalog &&
+    (level === 'negative' ||
+      level === 'zero' ||
+      level === 'conditional' ||
+      mod.status === 'outdated' ||
+      mod.status === 'redundant' ||
+      allowMediumUpgrade)
+  ) {
     const analogImpact =
       candidateAnalog.id === mod.id
         ? null
         : computeQuickModPoints(candidateAnalog, withoutSet, withoutAnalysis, prefs);
-    if (analogImpact !== null && analogImpact > impactPoints + 5) {
+    const minDelta = allowMediumUpgrade && level === 'medium' ? 15 : 5;
+    if (analogImpact !== null && analogImpact > impactPoints + minDelta) {
       betterAnalogId = candidateAnalog.id;
       betterAnalogName = candidateAnalog.name;
       betterAnalogDeltaPoints = analogImpact - impactPoints;
@@ -4036,7 +4172,14 @@ function computeQuickModPoints(
   baseAnalysis: ReturnType<typeof analyzeSelection>,
   prefs?: AssemblyPreferences
 ): number {
-  const res = evaluateModImpactInPack(mod, baseSet, baseSet.has(mod.id) ? baseAnalysis : undefined, prefs);
+  const replacementSet = buildReplacementEvalSet(mod, baseSet, prefs);
+  const useBase = replacementSet.size === baseSet.size && Array.from(replacementSet).every(id => baseSet.has(id));
+  const res = evaluateModImpactInPack(
+    mod,
+    replacementSet,
+    useBase && replacementSet.has(mod.id) ? baseAnalysis : undefined,
+    prefs
+  );
   return res.impactPoints;
 }
 
@@ -4102,10 +4245,11 @@ export function getModAnalogsComparison(
     const alt = MOD_BY_ID.get(pid);
     if (!alt) continue;
 
+    const altRecipeCompat = prefs ? getRecipeBridgeStatus(alt, withoutSet, prefs).compatible : true;
     const isRuleConflict = conflictingWithMod.has(alt.id);
     const isCoveredInAlt = matchesCoveredByName(mod.coveredBy, alt.name);
     const isAltCoveredInMod = matchesCoveredByName(alt.coveredBy, mod.name);
-    const altSupersedesMod = Boolean(mod.supersededBy?.includes(alt.id) || mod.supersededWhenAll?.includes(alt.id));
+    const altSupersedesMod = Boolean((mod.supersededBy?.includes(alt.id) || mod.supersededWhenAll?.includes(alt.id)) && altRecipeCompat && !isUnsupportedOnForge(alt));
     const modSupersedesAlt = Boolean(alt.supersededBy?.includes(mod.id) || alt.supersededWhenAll?.includes(mod.id));
     const isDualPair = Boolean(dual && (dual.forgeModId === alt.id || dual.fabricModId === alt.id || dual.altForgeIds?.includes(alt.id) || dual.altFabricIds?.includes(alt.id)));
     const isSwap = FABRIC_TO_FORGE_SWAP[mod.id] === alt.id || FABRIC_TO_FORGE_SWAP[alt.id] === mod.id;
@@ -4124,7 +4268,12 @@ export function getModAnalogsComparison(
     let canUseTogether: boolean;
     let coUsageNote: string;
 
-    if (isCoveredInAlt) {
+    if (!altRecipeCompat && (mod.supersededBy?.includes(alt.id) || mod.supersededWhenAll?.includes(alt.id))) {
+      relation = 'alternative';
+      relationLabel = 'Аналог для другой экосистемы рецептов';
+      canUseTogether = false;
+      coUsageNote = `${alt.name} требует другой просмотрщик рецептов (${getRecipeBridgeStatus(alt, withoutSet, prefs).reason || 'EMI/JEI'}), в текущем режиме используйте ${mod.name}.`;
+    } else if (isCoveredInAlt) {
       relation = 'builtin-covered';
       relationLabel = 'Встроено внутрь';
       canUseTogether = false;
@@ -4138,7 +4287,10 @@ export function getModAnalogsComparison(
       relation = 'better-replacement';
       relationLabel = 'Лучшая замена';
       canUseTogether = false;
-      coUsageNote = `Полностью заменяет ${mod.name}: ${alt.bestAlternative || 'быстрее, новее и стабильнее'}.`;
+      coUsageNote =
+        mod.status === 'diagnostic' && alt.status === 'diagnostic'
+          ? `Более надёжный и точный диагностический лидер вместо ${mod.name} (0% FPS — не нагружает тики и не конфликтует).`
+          : `Полностью заменяет ${mod.name}: ${alt.bestAlternative || 'быстрее, новее и стабильнее'}.`;
     } else if (modSupersedesAlt) {
       relation = 'overlap-duplicate';
       relationLabel = 'Слабее / перекрыт';
@@ -4175,10 +4327,18 @@ export function getModAnalogsComparison(
       coUsageNote = pairwiseWarnings[0]?.message || alt.bestAlternative || alt.warning || alt.description;
     }
 
-    // Evaluate compatible joint peers WITH current mod present (so dependent addons don't trigger false missing-parent penalties),
-    // and evaluate mutually-exclusive replacements WITHOUT current mod (what happens if you swap mod -> alt).
-    const evalSet = canUseTogether ? withModSet : withoutSet;
-    const evalAnalysis = canUseTogether ? withModAnalysis : withoutAnalysis;
+    // Evaluate compatible joint peers WITH current mod present (or clearing mutually-exclusive slot peer if mod depends on alt),
+    // and evaluate mutually-exclusive replacements via buildReplacementEvalSet so active pack slot peers (e.g. Emberbium) don't distort Embeddium/Oculus comparisons.
+    let evalSet: Set<string>;
+    let evalAnalysis: ReturnType<typeof analyzeSelection> | undefined;
+    if (canUseTogether) {
+      const modNeedsAlt = getDirectDependencies(mod.id, withoutSet).includes(alt.id);
+      evalSet = modNeedsAlt ? buildReplacementEvalSet(alt, withModSet, prefs) : withModSet;
+      evalAnalysis = evalSet === withModSet ? withModAnalysis : undefined;
+    } else {
+      evalSet = buildReplacementEvalSet(alt, withoutSet, prefs);
+      evalAnalysis = undefined;
+    }
     const altImpact = evaluateModImpactInPack(alt, evalSet, evalAnalysis, prefs);
     const points = altImpact.impactPoints;
     const relativeDeltaPoints = points - currentImpact.impactPoints;

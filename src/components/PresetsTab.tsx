@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   MODS_DATABASE,
   MOD_PRESETS,
@@ -108,38 +108,63 @@ export function PresetsTab({
     }
   };
 
+  const evaluatedPresets = useMemo(
+    () =>
+      MOD_PRESETS.map(preset => {
+        const evalPrefs = getEvalPrefs(preset);
+        const treeNodes = organizeAssemblyTree(preset.modIds);
+        const parentWithAddons = treeNodes.filter(n => n.children.length > 0);
+        const standaloneRoots = treeNodes.filter(n => n.children.length === 0);
+        const health = evaluateAssemblyHealth(preset.modIds);
+        const summary = summarizeAssemblyImpact(preset.modIds, health, evalPrefs);
+        const fps = estimateFpsRange(preset.modIds, summary, evalPrefs);
+        const redCount =
+          health.conflicts.length + health.warnings.filter(w => w.severity === 'red').length;
+        const yellowCount = health.warnings.filter(w => w.severity === 'yellow').length;
+        return {
+          preset,
+          treeNodes,
+          parentWithAddons,
+          standaloneRoots,
+          health,
+          summary,
+          fps,
+          redCount,
+          yellowCount,
+        };
+      }),
+    []
+  );
+
   return (
     <div className="space-y-4">
-      {MOD_PRESETS.length >= 2 && (() => {
-        const evaluated = MOD_PRESETS.map(p => {
-          const evalPrefs = getEvalPrefs(p);
-          const health = evaluateAssemblyHealth(p.modIds);
-          const summary = summarizeAssemblyImpact(p.modIds, health, evalPrefs);
-          const fps = estimateFpsRange(p.modIds, summary, evalPrefs);
-          return { preset: p, summary, fps };
-        });
-
+      {evaluatedPresets.length >= 2 && (() => {
         const rows = [
           {
             label: 'Рендер-связка',
-            values: evaluated.map(e => getRenderLabel(e.preset)),
+            values: evaluatedPresets.map(e => getRenderLabel(e.preset)),
           },
           {
             label: 'Sinytra Connector',
-            values: evaluated.map(e => getSinytraLabel(e.preset)),
+            values: evaluatedPresets.map(e => getSinytraLabel(e.preset)),
           },
           {
             label: 'Прогноз FPS / ОЗУ',
-            values: evaluated.map(e => `${e.fps.shortLabel.replace(' (оценка)', '')} · ${e.summary.resourceBalance.ramDeltaLabel}`),
+            values: evaluatedPresets.map(
+              e => `${e.fps.shortLabel.replace(' (оценка)', '')} · ${e.summary.resourceBalance.ramDeltaLabel}`
+            ),
           },
           {
             label: 'Шанс артефактов',
-            values: evaluated.map(e => `${e.summary.artifactRisk.chancePct}% · ${e.summary.artifactRisk.label}`),
+            values: evaluatedPresets.map(
+              e => `${e.summary.artifactRisk.chancePct}% · ${e.summary.artifactRisk.label}`
+            ),
           },
           {
             label: 'Итог (Оценка · Моды)',
-            values: evaluated.map(
-              e => `${e.summary.assemblyScore}/100 · ${e.preset.modIds.length} м. · ${e.summary.coveredSubsystems.length}/7`
+            values: evaluatedPresets.map(
+              e =>
+                `${e.summary.assemblyScore}/100 · ${e.preset.modIds.length} м. · ${e.summary.coveredSubsystems.length}/7`
             ),
           },
         ];
@@ -150,7 +175,7 @@ export function PresetsTab({
               <thead>
                 <tr className="border-b border-[#2a2e33] bg-[#121417] text-[#8b9199]">
                   <th className="py-2 px-3.5 font-semibold whitespace-nowrap">Критерий</th>
-                  {evaluated.map(({ preset }, idx) => (
+                  {evaluatedPresets.map(({ preset }, idx) => (
                     <th
                       key={preset.id}
                       className={`py-2 px-3.5 font-semibold whitespace-nowrap ${
@@ -180,20 +205,17 @@ export function PresetsTab({
       })()}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {MOD_PRESETS.map(preset => {
-          const evalPrefs = getEvalPrefs(preset);
-          const treeNodes = organizeAssemblyTree(preset.modIds);
-          const parentWithAddons = treeNodes.filter(n => n.children.length > 0);
-          const standaloneRoots = treeNodes.filter(n => n.children.length === 0);
+        {evaluatedPresets.map(
+          ({
+            preset,
+            parentWithAddons,
+            standaloneRoots,
+            summary: presetSummary,
+            fps: presetFps,
+            redCount: presetRedCount,
+            yellowCount: presetYellowCount,
+          }) => {
           const badgeTone = getBadgeTone(preset.badgeColor);
-
-          const presetHealth = evaluateAssemblyHealth(preset.modIds);
-          const presetSummary = summarizeAssemblyImpact(preset.modIds, presetHealth, evalPrefs);
-          const presetFps = estimateFpsRange(preset.modIds, presetSummary, evalPrefs);
-          const presetRedCount =
-            presetHealth.conflicts.length +
-            presetHealth.warnings.filter(w => w.severity === 'red').length;
-          const presetYellowCount = presetHealth.warnings.filter(w => w.severity === 'yellow').length;
 
           return (
             <div
@@ -388,7 +410,8 @@ export function PresetsTab({
               </div>
             </div>
           );
-        })}
+        }
+        )}
       </div>
     </div>
   );
