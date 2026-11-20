@@ -591,7 +591,7 @@
     "healthTier": "yellow",
     "description": "Очень нишевый мод (~434 скачивания на CF, ~95 на Modrinth): кеширует DataFixerUpper при проверке устаревших структур датапаков.",
     "bestAlternative": "Главным проверенным ускорителем генерации структур является Structure Layout Optimizer (31M+ CF).",
-    "warning": "Малоустановленный нишевый мод — используйте в дополнение к Structure Layout Optimizer только при реальных лагах DFU.",
+    "warning": "Требует библиотеку RinLib. Малоустановленный нишевый мод — используйте в дополнение к Structure Layout Optimizer только при реальных лагах DFU.",
     "tags": [],
     "curseforgeUrl": "https://www.curseforge.com/minecraft/mc-mods/structure-dfu-cache",
     "groupId": "worldgen-chunks",
@@ -1875,11 +1875,11 @@
     "platform": "Forge",
     "installed": false,
     "status": "recommended",
-    "statusLabel": "Мастхэв для гравия/песка",
+    "statusLabel": "Фикс падения гравия/песка",
     "healthTier": "green",
-    "description": "Полностью устраняет жуткие лаги и падение FPS до 1-2 кадров при одновременном падении сотен блоков гравия или песка в шахтах и пустынях.",
-    "bestAlternative": "Мастхэв для выживания в шахтах.",
-    "warning": "",
+    "description": "Мод от SmartStreamLabs: устраняет падение FPS и лаги TPS при обрушении сотен блоков гравия и песка за счёт удаления лишних падающих сущностей поблизости с сохранением их дропа.",
+    "bestAlternative": "Полезно для шахт и выживания, если вы не строите фермы/ловушки на падающем песке.",
+    "warning": "Меняет механику ради FPS: удаляет лишние падающие сущности песка и гравия (дроп сохраняется), поэтому может нарушить редстоун-механизмы на падающем песке или бетоне.",
     "tags": [],
     "curseforgeUrl": "https://www.curseforge.com/minecraft/mc-mods/falling-blocks-fps-fix",
     "groupId": "tick-physics-engine",
@@ -1998,7 +1998,7 @@
     "isGroupLeader": false,
     "isGroupAddon": false,
     "addons": [],
-    "coveredBy": "Immersive Optimization.",
+    "coveredBy": "Immersive Optimization",
     "supersededBy": [
       "immersive-optimization"
     ]
@@ -2043,7 +2043,7 @@
     "isGroupLeader": false,
     "isGroupAddon": false,
     "addons": [],
-    "coveredBy": "ServerCore.",
+    "coveredBy": "ServerCore",
     "supersededBy": [
       "servercore"
     ]
@@ -2306,7 +2306,7 @@
     "isGroupLeader": false,
     "isGroupAddon": false,
     "addons": [],
-    "coveredBy": "ServerCore.",
+    "coveredBy": "ServerCore",
     "supersededBy": [
       "servercore"
     ]

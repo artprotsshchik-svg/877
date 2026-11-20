@@ -125,10 +125,19 @@ export const EXCLUSIVE_ENGINE_POOLS: Record<string, string[]> = {
     'clearlagg-server-forge',
     'customizable-entity-clear',
   ],
-  'mob-despawn': ['let-me-despawn', 'despawntweaker'],
+  'mob-despawn': ['let-me-despawn', 'despawntweaker', 'despawn-tweaks', 'despawn-tweaks-modern-port'],
   'weather-disable': ['no-rain', 'disable-rain'],
   'potion-particles': ['no-more-potion-particles', 'noeffectparticles'],
   'damage-particles': ['limited-damage-indicator-particle', 'no-damage-indicator-heart-particles'],
+  'stutterfix-ports': ['stutterfix-reforged', 'stutterfix-modern-port'],
+  'language-reload': ['language-reload-reforged', 'languagereloadunofficial'],
+  'capability-fix': ['capability-fix-revived', 'capability-fix'],
+  'client-chunk-cache': ['bobby-reforged', 'farsight'],
+  'furnace-cache': ['fastfurnace', 'furnaceoptimizer'],
+  'explosion-optimizers': ['better-tnt', 'perfomant-boom'],
+  'f3-debug-screen': ['compact-f3-plus', 'improved-f3'],
+  'splash-screen-hooks': ['smooth-loading-screens', 'early-loading-screen', 'splashscreen'],
+  'entity-tick-sleep': ['entitysleep', 'enttick', 'sleepium', 'martensite-entity-tick-skiper'],
 };
 
 export const MOD_HARD_DEPENDENCIES: Record<string, string[]> = {
@@ -156,19 +165,26 @@ export const MOD_HARD_DEPENDENCIES: Record<string, string[]> = {
   'connector-extras': ['sinytra-connector'],
   'particle-core': ['kotlin-for-forge', 'fzzy-config'],
   'fzzy-config': ['kotlin-for-forge'],
-  'observable': ['kotlin-for-forge'],
   'lazyyyyy': ['forgified-fabric-api', 'kotlin-for-forge'],
+  'geckolib-animation-optimizer': ['geckolib'],
   'geckolibbetterfps': ['geckolib', 'embeddium'],
   'structure-layout-optimizer': ['resourceful-config'],
+  'structure-dfu-cache': ['rinlib'],
   'chunkyborder': ['chunky'],
   'ggtu': ['embeddium', 'oculus'],
   'enhanced-block-entities-reloaded': ['matlib'],
+  'fast-item-frames': ['puzzles-lib'],
+  'let-me-despawn': ['almanac'],
+  'observable': ['kotlin-for-forge', 'architectury-api'],
   'connectivity': ['cupboard'],
+  'fastsuite': ['placebo'],
+  'fastfurnace': ['placebo'],
+  'fastworkbench': ['placebo'],
   'fastali': ['advanced-loot-info-ali'],
   'tmrv-updated': ['emi'],
   'emi-loot': ['emi', 'fzzy-config'],
   'emi-ores': ['emi'],
-  'emiffect': ['emi'],
+  'emiffect': ['emi', 'fzzy-config'],
   'emi-trades': ['emi'],
   'emi-professions': ['emi'],
   'jeioptimizer': ['just-enough-items-jei'],
@@ -205,6 +221,11 @@ const PURE_LIBRARY_MOD_IDS = new Set([
   'resourceful-config',
   'sodium-embeddium-options-api',
   'geckolib',
+  'puzzles-lib',
+  'almanac',
+  'placebo',
+  'architectury-api',
+  'rinlib',
 ]);
 
 export function findModByDisplayName(name: string): ModItem | undefined {
@@ -410,21 +431,25 @@ export function getExclusivePoolForMod(modId: string): { groupId: string; poolId
   return null;
 }
 
+const RULE_CONFLICT_CACHE = new Map<string, string[]>();
+
 export function getRuleConflictingIds(modId: string): string[] {
+  const cached = RULE_CONFLICT_CACHE.get(modId);
+  if (cached) return cached;
+
   const mod = MOD_BY_ID.get(modId);
   if (!mod) return [];
-  const slug = normalizeSlug(mod.name);
+  const slug = MOD_SLUG_BY_ID.get(modId) ?? normalizeSlug(mod.name);
   const conflicts = new Set<string>();
 
-  for (const rule of INCOMPATIBILITY_RULES) {
-    const ruleSlugs = rule.conflictingMods.map(normalizeSlug);
-    if (!ruleSlugs.includes(slug)) continue;
+  for (const { rule, slugSet } of PRECOMPUTED_RULES) {
+    if (!slugSet.has(slug)) continue;
 
     if (rule.title.includes('OptiFine')) {
       for (const m of MODS_DATABASE) {
-        const ms = normalizeSlug(m.name);
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
         if (slug === 'optifine') {
-          if (ms !== 'optifine' && ruleSlugs.includes(ms)) conflicts.add(m.id);
+          if (ms !== 'optifine' && slugSet.has(ms)) conflicts.add(m.id);
         } else if (ms === 'optifine') {
           conflicts.add(m.id);
         }
@@ -434,9 +459,9 @@ export function getRuleConflictingIds(modId: string): string[] {
 
     if (rule.title.includes('Nvidium и шейдеров')) {
       for (const m of MODS_DATABASE) {
-        const ms = normalizeSlug(m.name);
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
         if (NVIDIUM_FAMILY_IDS.has(mod.id)) {
-          if (!NVIDIUM_FAMILY_IDS.has(m.id) && ruleSlugs.includes(ms)) conflicts.add(m.id);
+          if (!NVIDIUM_FAMILY_IDS.has(m.id) && slugSet.has(ms)) conflicts.add(m.id);
         } else if (NVIDIUM_FAMILY_IDS.has(m.id)) {
           conflicts.add(m.id);
         }
@@ -446,8 +471,8 @@ export function getRuleConflictingIds(modId: string): string[] {
 
     if (rule.title.includes('Nvidium ↔ Alloyium')) {
       for (const m of MODS_DATABASE) {
-        const ms = normalizeSlug(m.name);
-        if (m.id === modId || !ruleSlugs.includes(ms)) continue;
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
+        if (m.id === modId || !slugSet.has(ms)) continue;
         if (NVIDIUM_FAMILY_IDS.has(mod.id) && NVIDIUM_FAMILY_IDS.has(m.id)) continue;
         conflicts.add(m.id);
       }
@@ -456,9 +481,9 @@ export function getRuleConflictingIds(modId: string): string[] {
 
     if (rule.title.includes('Emberbium с аддонами Embeddium')) {
       for (const m of MODS_DATABASE) {
-        const ms = normalizeSlug(m.name);
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
         if (mod.id === 'emberbium') {
-          if (m.id !== 'emberbium' && ruleSlugs.includes(ms)) conflicts.add(m.id);
+          if (m.id !== 'emberbium' && slugSet.has(ms)) conflicts.add(m.id);
         } else if (m.id === 'emberbium') {
           conflicts.add(m.id);
         }
@@ -468,9 +493,9 @@ export function getRuleConflictingIds(modId: string): string[] {
 
     if (rule.title.includes('Acedium/Revidium с шейдерами')) {
       for (const m of MODS_DATABASE) {
-        const ms = normalizeSlug(m.name);
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
         if (mod.id === 'revidium-accedium') {
-          if (m.id !== 'revidium-accedium' && ruleSlugs.includes(ms)) conflicts.add(m.id);
+          if (m.id !== 'revidium-accedium' && slugSet.has(ms)) conflicts.add(m.id);
         } else if (m.id === 'revidium-accedium') {
           conflicts.add(m.id);
         }
@@ -480,9 +505,9 @@ export function getRuleConflictingIds(modId: string): string[] {
 
     if (rule.title.includes('Xenon с аддонами Embeddium')) {
       for (const m of MODS_DATABASE) {
-        const ms = normalizeSlug(m.name);
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
         if (mod.id === 'xenon') {
-          if (m.id !== 'xenon' && ruleSlugs.includes(ms)) conflicts.add(m.id);
+          if (m.id !== 'xenon' && slugSet.has(ms)) conflicts.add(m.id);
         } else if (m.id === 'xenon') {
           conflicts.add(m.id);
         }
@@ -490,8 +515,32 @@ export function getRuleConflictingIds(modId: string): string[] {
       continue;
     }
 
+    if (rule.title.includes('Dimensional Threading')) {
+      for (const m of MODS_DATABASE) {
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
+        if (mod.id === 'dimensional-threading-reforked') {
+          if (m.id !== 'dimensional-threading-reforked' && slugSet.has(ms)) conflicts.add(m.id);
+        } else if (m.id === 'dimensional-threading-reforked') {
+          conflicts.add(m.id);
+        }
+      }
+      continue;
+    }
+
+    if (rule.title.includes('Zstd-сжатия')) {
+      for (const m of MODS_DATABASE) {
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
+        if (mod.id === 'zstdnet') {
+          if (m.id !== 'zstdnet' && slugSet.has(ms)) conflicts.add(m.id);
+        } else if (m.id === 'zstdnet') {
+          conflicts.add(m.id);
+        }
+      }
+      continue;
+    }
+
     for (const m of MODS_DATABASE) {
-      if (m.id !== modId && ruleSlugs.includes(normalizeSlug(m.name))) {
+      if (m.id !== modId && slugSet.has(MOD_SLUG_BY_ID.get(m.id) || '')) {
         conflicts.add(m.id);
       }
     }
@@ -504,7 +553,9 @@ export function getRuleConflictingIds(modId: string): string[] {
     }
   }
 
-  return Array.from(conflicts);
+  const result = Array.from(conflicts);
+  RULE_CONFLICT_CACHE.set(modId, result);
+  return result;
 }
 
 export function analyzeSelection(selectedIds: string[]) {
@@ -610,6 +661,42 @@ export function analyzeSelection(selectedIds: string[]) {
       );
       if (others.length > 0) {
         const matched = [xenon, ...others];
+        matched.forEach(m => conflictingIdSet.add(m.id));
+        conflicts.push({
+          rule,
+          matchedIds: matched.map(m => m.id),
+          matchedNames: matched.map(m => m.name),
+        });
+      }
+      continue;
+    }
+
+    if (rule.title.includes('Dimensional Threading')) {
+      const dimThread = selectedMods.find(m => m.id === 'dimensional-threading-reforked');
+      if (!dimThread) continue;
+      const others = selectedMods.filter(
+        m => m.id !== 'dimensional-threading-reforked' && slugSet.has(MOD_SLUG_BY_ID.get(m.id) || '')
+      );
+      if (others.length > 0) {
+        const matched = [dimThread, ...others];
+        matched.forEach(m => conflictingIdSet.add(m.id));
+        conflicts.push({
+          rule,
+          matchedIds: matched.map(m => m.id),
+          matchedNames: matched.map(m => m.name),
+        });
+      }
+      continue;
+    }
+
+    if (rule.title.includes('Zstd-сжатия')) {
+      const zstd = selectedMods.find(m => m.id === 'zstdnet');
+      if (!zstd) continue;
+      const others = selectedMods.filter(
+        m => m.id !== 'zstdnet' && slugSet.has(MOD_SLUG_BY_ID.get(m.id) || '')
+      );
+      if (others.length > 0) {
+        const matched = [zstd, ...others];
         matched.forEach(m => conflictingIdSet.add(m.id));
         conflicts.push({
           rule,
@@ -869,6 +956,127 @@ export function analyzeSelection(selectedIds: string[]) {
       modName: 'GeckoLib Animation Optimizer',
       severity: 'yellow',
       message: 'Установлены оба оптимизатора GeckoLib (GeckolibBetterFPS + GeckoLib Animation Optimizer) — обычно достаточно одного GeckolibBetterFPS.',
+    });
+  }
+
+  if (selectedSet.has('prismanium') && selectedSet.has('sodium-embeddium-dynamic-lights')) {
+    warnings.push({
+      modId: 'sodium-embeddium-dynamic-lights',
+      modName: 'Sodium/Embeddium Dynamic Lights',
+      severity: 'yellow',
+      message: 'Prismanium уже содержит встроенное динамическое освещение — отдельный Sodium/Embeddium Dynamic Lights дублирует его.',
+    });
+  }
+
+  if (selectedSet.has('distant-horizons')) {
+    for (const cacheId of ['bobby-reforged', 'farsight'] as const) {
+      if (selectedSet.has(cacheId)) {
+        const cacheName = MOD_BY_ID.get(cacheId)?.name || cacheId;
+        warnings.push({
+          modId: cacheId,
+          modName: cacheName,
+          severity: 'yellow',
+          message: `Distant Horizons полностью заменяет клиентский кэш чанков ${cacheName} более лёгким LOD-конвейером.`,
+        });
+      }
+    }
+  }
+
+  if (selectedSet.has('servercore')) {
+    for (const adaptiveId of ['adaptive-performance-tweaks', 'adaptive-optimization-reborn'] as const) {
+      if (selectedSet.has(adaptiveId)) {
+        const adaptiveName = MOD_BY_ID.get(adaptiveId)?.name || adaptiveId;
+        warnings.push({
+          modId: adaptiveId,
+          modName: adaptiveName,
+          severity: 'yellow',
+          message: `Пересечение адаптивных контроллеров TPS: ServerCore и ${adaptiveName} одновременно регулируют ИИ мобов и дальность — оставьте один ServerCore.`,
+        });
+      }
+    }
+  }
+
+  if (selectedSet.has('mob-collision-off')) {
+    for (const colId of ['farmcollisionless', 'entity-collision-optimization'] as const) {
+      if (selectedSet.has(colId)) {
+        const colName = MOD_BY_ID.get(colId)?.name || colId;
+        warnings.push({
+          modId: colId,
+          modName: colName,
+          severity: 'yellow',
+          message: `Mob Collision Off уже полностью отключает коллизии мобов — ${colName} в этой паре избыточен.`,
+        });
+      }
+    }
+  }
+
+  if (selectedSet.has('particle-core') && selectedSet.has('asyncparticles')) {
+    warnings.push({
+      modId: 'asyncparticles',
+      modName: 'AsyncParticles',
+      severity: 'yellow',
+      message: 'Particle Core уже оптимизирует и отсекает частицы — добавление AsyncParticles повышает риск гонок потоков и мерцаний (особенно в Botania).',
+    });
+  }
+
+  if (selectedSet.has('immersive-optimization')) {
+    for (const sleepId of ['entitysleep', 'enttick', 'sleepium', 'martensite-entity-tick-skiper'] as const) {
+      if (selectedSet.has(sleepId)) {
+        const sleepName = MOD_BY_ID.get(sleepId)?.name || sleepId;
+        warnings.push({
+          modId: sleepId,
+          modName: sleepName,
+          severity: 'yellow',
+          message: `Immersive Optimization уже адаптивно замедляет тики дальних сущностей — ${sleepName} дублирует троттлинг мобов.`,
+        });
+      }
+    }
+  }
+
+  if (hasAnyC2ME) {
+    if (selectedSet.has('parallel-world-save') && selectedSet.has('c2mer')) {
+      warnings.push({
+        modId: 'parallel-world-save',
+        modName: 'Parallel World Save',
+        severity: 'yellow',
+        message: 'C2MER уже переводит сохранение чанков в асинхронный режим — Parallel World Save создаёт двойной перехват записи мира.',
+      });
+    }
+    if (selectedSet.has('delta-chunk')) {
+      warnings.push({
+        modId: 'delta-chunk',
+        modName: 'Delta Chunk',
+        severity: 'yellow',
+        message: 'Связка Delta Chunk + C2ME создаёт конкуренцию асинхронных перехватчиков записи чанков на диск — оставьте только C2ME.',
+      });
+    }
+  } else if (selectedSet.has('parallel-world-save') && selectedSet.has('delta-chunk')) {
+    warnings.push({
+      modId: 'delta-chunk',
+      modName: 'Delta Chunk',
+      severity: 'yellow',
+      message: 'Параллельная запись Parallel World Save и дельта-сохранение Delta Chunk перехватывают один и тот же цикл записи чанков — оставьте один мод.',
+    });
+  }
+
+  if (selectedSet.has('resourcepackcached')) {
+    for (const rpId of ['keep-the-resourcepack', 'packforge'] as const) {
+      if (selectedSet.has(rpId)) {
+        const rpName = MOD_BY_ID.get(rpId)?.name || rpId;
+        warnings.push({
+          modId: rpId,
+          modName: rpName,
+          severity: 'yellow',
+          message: `ResourcePackCached уже кэширует распакованные ресурс-паки на диске — ${rpName} дублирует кэширование ZIP-архивов при запуске.`,
+        });
+      }
+    }
+  } else if (selectedSet.has('keep-the-resourcepack') && selectedSet.has('packforge')) {
+    warnings.push({
+      modId: 'packforge',
+      modName: 'PackForge',
+      severity: 'yellow',
+      message: 'Keep The ResourcePack и PackForge одновременно вмешиваются в распаковку ресурс-паков — оставьте один (лучше ResourcePackCached).',
     });
   }
 
@@ -2530,11 +2738,16 @@ export const LIBRARY_CONSUMER_MAP: Record<string, string[]> = {
   'matlib': ['enhanced-block-entities-reloaded'],
   'cupboard': ['connectivity'],
   'sodium-embeddium-options-api': ['sodium-embeddium-dynamic-lights'],
-  'fzzy-config': ['particle-core', 'emi-loot'],
-  'kotlin-for-forge': ['fzzy-config', 'particle-core', 'light-config', 'observable', 'lazyyyyy', 'emi-loot'],
+  'fzzy-config': ['particle-core', 'emi-loot', 'emiffect'],
+  'kotlin-for-forge': ['fzzy-config', 'particle-core', 'light-config', 'observable', 'lazyyyyy', 'emi-loot', 'emiffect'],
   'geckolib': ['geckolib-animation-optimizer', 'geckolibbetterfps'],
   'cloth-config-v12': ['sodium-embeddium-dynamic-lights', 'more-culling-reforged', 'entity-culling', 'dynamic-fps', 'culllessleaves-reforged'],
   'resourceful-config': ['structure-layout-optimizer'],
+  'puzzles-lib': ['fast-item-frames'],
+  'almanac': ['let-me-despawn'],
+  'placebo': ['fastsuite', 'fastfurnace', 'fastworkbench'],
+  'architectury-api': ['observable'],
+  'rinlib': ['structure-dfu-cache'],
 };
 
 export const SINYTRA_BRIDGE_IDS = new Set(['sinytra-connector', 'forgified-fabric-api', 'connector-extras']);
@@ -3196,9 +3409,13 @@ export function evaluateDubiousMods(
       severity = 'medium';
       reason =
         warnings[0]?.message ||
-        mod.warning ||
-        mod.bestAlternative ||
-        'Условный, устаревший или требующий точной настройки мод.';
+        (mod.id === 'zstdnet'
+          ? 'Заменяет сетевое zlib-сжатие на Zstandard (Zstd): должен стоять и на сервере, и у всех клиентов, иначе игроки не смогут подключиться.'
+          : mod.id === 'asyncparticles'
+            ? 'Асинхронные тики частиц могут вызывать мерцание или пропадание эффектов в Botania и с кастомными частицами.'
+            : mod.warning ||
+              mod.bestAlternative ||
+              'Условный, устаревший или требующий точной настройки мод.');
     } else if (
       mod.id === 'accelerated-rendering' ||
       mod.id === 'accelerated-rendering-turned' ||
@@ -3214,6 +3431,31 @@ export function evaluateDubiousMods(
           : mod.id === 'more-culling-reforged'
             ? 'Агрессивный куллинг граней — при наложении с другими куллерами возможны просветы текстур.'
             : mod.warning || mod.bestAlternative || 'Экспериментальный или требовательный к видеопамяти/миксинам мод.';
+    } else if (
+      mod.id === 'flywheel' &&
+      (selectedSet.has('oculus') || selectedSet.has('emberlens'))
+    ) {
+      severity = 'low';
+      reason = 'С шейдерами Oculus/Emberlens GPU-инстансинг Flywheel 1.0 отключается без моста (Iris & Oculus Flywheel Compat / Colorwheel), снижая FPS у механизмов Create.';
+    } else if (
+      mod.id === 'distant-horizons' &&
+      (selectedSet.has('concurrent-chunk-management-engine-forge-c2me') ||
+        selectedSet.has('c2me-concurrent-chunk-management-engine') ||
+        selectedSet.has('c2mer'))
+    ) {
+      severity = 'low';
+      reason = 'В паре с C2ME одновременно нагружает все потоки CPU генерацией LOD и чанков — ограничьте CPU Load в конфиге Distant Horizons.';
+    } else if (
+      mod.id === 'chunky' &&
+      (selectedSet.has('distant-horizons') ||
+        selectedSet.has('concurrent-chunk-management-engine-forge-c2me') ||
+        selectedSet.has('c2me-concurrent-chunk-management-engine') ||
+        selectedSet.has('c2mer'))
+    ) {
+      severity = 'low';
+      reason = selectedSet.has('distant-horizons')
+        ? 'Во время активной предгенерации (/chunky start) временно отключайте фоновую генерацию LOD в Distant Horizons, чтобы не перегружать CPU и диск.'
+        : 'Предгенерация Chunky в паре с C2ME утилизирует все ядра CPU и диск — следите за нагревом/ОЗУ во время /chunky start.';
     } else if (NETWORK_MULTIPLAYER_IDS.has(mod.id) && prefs?.mode === 'singleplayer' && mod.id !== 'krypton-reno') {
       severity = 'low';
       reason = 'Серверный/сетевой оптимизатор: в одиночной игре почти не даёт прироста.';
@@ -3778,8 +4020,13 @@ export function evaluateModImpactInPack(
     addSynergy(['ferritecore', 'alltheleaks-memory-leak-fix', 'jasione'], 'В связке с FerriteCore / AllTheLeaks снижает RAM на 35–50% и закрывает утечки памяти', 180);
   } else if (mod.id === 'ferritecore') {
     addSynergy(['modernfix', 'alltheleaks-memory-leak-fix'], 'Вместе с ModernFix даёт максимальную экономию ОЗУ на моделях и блоках', 150);
-  } else if (mod.id === 'alltheleaks-memory-leak-fix' || mod.id === 'jasione' || mod.id === 'duplicate-nbt-flattener') {
-    addSynergy(['modernfix', 'ferritecore'], 'Закрывает утечки и Enum/NBT-аллокации поверх ядра ModernFix', 120);
+  } else if (
+    mod.id === 'alltheleaks-memory-leak-fix' ||
+    mod.id === 'jasione' ||
+    mod.id === 'duplicate-nbt-flattener' ||
+    mod.id === 'put-a-plug-in-it-papi'
+  ) {
+    addSynergy(['modernfix', 'ferritecore'], 'Закрывает утечки кэша (ModelManager/ItemStackKey) и Enum/NBT-аллокации поверх ядра ModernFix', 120);
   } else if (mod.id === 'calm-the-leaks') {
     addSynergy(['alltheleaks-memory-leak-fix', 'spark'], 'Фильтрует отчёты утечек AllTheLeaks и связывает тренды со spark', 90);
   }
@@ -3893,9 +4140,12 @@ export function evaluateModImpactInPack(
     addSynergy(['flerovium'], 'Совместно ускоряют толпы мобов (Compute) и предметы/частицы (Flerovium), если хватает VRAM', 60);
   }
   if (mod.id === 'fast-sounds') {
-    addSynergy(['soundgc', 'reload-looping-sound-fix', 'thulium'], 'Кэш OpenAL + очистка буферов (SoundGC / Reload Looping Sound Fix / Thulium) без дублирования', 100);
-  } else if (mod.id === 'soundgc' || mod.id === 'reload-looping-sound-fix' || mod.id === 'thulium') {
+    addSynergy(['soundgc', 'thulium'], 'Кэш OpenAL + очистка буферов (SoundGC / Thulium) без дублирования', 100);
+    addSynergy(['reload-looping-sound-fix'], 'Сохраняет зацикленные звуки после F3+T (MC-194284)', 60);
+  } else if (mod.id === 'soundgc' || mod.id === 'thulium') {
     addSynergy(['fast-sounds'], 'Дополняет Fast Sounds очисткой/оптимизацией буферов OpenAL и GC аудио-потока', 80);
+  } else if (mod.id === 'reload-looping-sound-fix') {
+    addSynergy(['fast-sounds'], 'Дополняет Fast Sounds исправлением обрыва зацикленных звуков при F3+T (MC-194284)', 80);
   }
   if (mod.id === 'advanced-loot-info-ali' && withoutSet.has('fastali')) {
     addSynergy(['fastali'], 'FastALI полностью убирает 10–20 сек. зависание ALI при входе в мир', 120);
@@ -3914,6 +4164,215 @@ export function evaluateModImpactInPack(
   }
   if (mod.id === 'distant-horizons' && (withoutSet.has('oculus') || withoutSet.has('emberlens')) && withoutSet.has('distant-horizons-memory-fix-dh')) {
     addSynergy(['distant-horizons-memory-fix-dh'], 'DH Memory Fix страхует утечки памяти при работе LOD вместе с шейдерами', 100);
+  }
+  if (mod.id === 'distant-horizons') {
+    addOverlap(['bobby-reforged', 'farsight'], 'Distant Horizons заменяет локальный кэш чанков Bobby/Farsight собственным LOD-движком', -40);
+    if (
+      withoutSet.has('concurrent-chunk-management-engine-forge-c2me') ||
+      withoutSet.has('c2me-concurrent-chunk-management-engine') ||
+      withoutSet.has('c2mer')
+    ) {
+      interactions.push({
+        kind: 'context',
+        targetIds: ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer'].filter(id => withoutSet.has(id)),
+        targetNames: ['C2ME'],
+        summary: 'Одновременная генерация LOD Distant Horizons и многопоточных чанков C2ME насыщает все потоки CPU — снизьте numberOfThreads / CPU Load в config/DistantHorizons.toml',
+        impactDelta: 0,
+      });
+    }
+  } else if ((mod.id === 'bobby-reforged' || mod.id === 'farsight') && withoutSet.has('distant-horizons')) {
+    addOverlap(['distant-horizons'], 'Перекрыт Distant Horizons: для дальнего обзора достаточно одного DH', -140);
+  }
+
+  if (mod.id === 'prismanium') {
+    addOverlap(['sodium-embeddium-dynamic-lights'], 'В Prismanium уже встроено динамическое освещение — отдельный Sodium/Embeddium Dynamic Lights лишний', -80);
+    if (withoutSet.has('sodium-chloride')) {
+      interactions.push({
+        kind: 'context',
+        targetIds: ['sodium-chloride'],
+        targetNames: ['(Sodium) Chloride'],
+        summary: 'Отключите динамический свет либо в Prismanium, либо в config/chloride-client.toml во избежание дублирования',
+        impactDelta: 0,
+      });
+    }
+  } else if (mod.id === 'sodium-embeddium-dynamic-lights' && withoutSet.has('prismanium')) {
+    addOverlap(['prismanium'], 'Встроенный динамический свет Prismanium дублирует этот мод', -90);
+  }
+
+  if ((mod.id === 'flywheel' || mod.id === 'vanillin') && (withoutSet.has('oculus') || withoutSet.has('emberlens'))) {
+    const shaderTargets = ['oculus', 'emberlens'].filter(id => withoutSet.has(id));
+    interactions.push({
+      kind: 'context',
+      targetIds: shaderTargets,
+      targetNames: shaderTargets.map(id => MOD_BY_ID.get(id)?.name || id),
+      summary: 'С шейдерами Oculus/Emberlens GPU-инстансинг Flywheel 1.0 отключается без моста совместимости (Iris & Oculus Flywheel Compat / Colorwheel) — возможен откат на CPU-рендер механизмов Create',
+      impactDelta: 0,
+    });
+  }
+
+  if (mod.id === 'gputape' && (withoutSet.has('oculus') || withoutSet.has('emberlens'))) {
+    const shaderTargets = ['oculus', 'emberlens'].filter(id => withoutSet.has(id));
+    interactions.push({
+      kind: 'context',
+      targetIds: shaderTargets,
+      targetNames: shaderTargets.map(id => MOD_BY_ID.get(id)?.name || id),
+      summary: 'Важно при игре с шейдерами: держите useRboDepth = false в config/gputape.toml, иначе RBO depth сломает глубину кадра шейдерпаков',
+      impactDelta: 0,
+    });
+  }
+
+  if (mod.id === 'immediatelyfast' && (withoutSet.has('oculus') || withoutSet.has('emberlens'))) {
+    const shaderTargets = ['oculus', 'emberlens'].filter(id => withoutSet.has(id));
+    interactions.push({
+      kind: 'context',
+      targetIds: shaderTargets,
+      targetNames: shaderTargets.map(id => MOD_BY_ID.get(id)?.name || id),
+      summary: 'Если с шейдерами мерцают HUD, таблички или зачарования, отключите hud_batching / experimental_sign_text_buffering в config/immediatelyfast.json',
+      impactDelta: 0,
+    });
+  }
+
+  if (mod.id === 'servercore' && (withoutSet.has('adaptive-performance-tweaks') || withoutSet.has('adaptive-optimization-reborn'))) {
+    addOverlap(['adaptive-performance-tweaks', 'adaptive-optimization-reborn'], 'Двойное адаптивное ограничение ИИ и дистанции тиков — достаточно одного ServerCore', -60);
+  } else if ((mod.id === 'adaptive-performance-tweaks' || mod.id === 'adaptive-optimization-reborn') && withoutSet.has('servercore')) {
+    addOverlap(['servercore'], 'Перекрывается ServerCore: одновременный троттлинг мобов и view-distance излишен', -110);
+  }
+
+  if (mod.id === 'mob-collision-off' && (withoutSet.has('farmcollisionless') || withoutSet.has('entity-collision-optimization'))) {
+    addOverlap(['farmcollisionless', 'entity-collision-optimization'], 'Mob Collision Off полностью отключает коллизии мобов, делая остальные фиксы столкновений лишними', -50);
+  } else if ((mod.id === 'farmcollisionless' || mod.id === 'entity-collision-optimization') && withoutSet.has('mob-collision-off')) {
+    addOverlap(['mob-collision-off'], 'Перекрыт Mob Collision Off: когда коллизии полностью отключены, оптимизация выталкивания не нужна', -120);
+  } else if (mod.id === 'entity-collision-optimization' && withoutSet.has('radium-re-reforged')) {
+    interactions.push({
+      kind: 'context',
+      targetIds: ['radium-re-reforged'],
+      targetNames: ['Radium Re-Reforged'],
+      summary: 'Значительная часть оптимизаций коллизий уже есть в Radium Re-Reforged — отдельный мод полезен лишь для экстремально плотных ферм мобов',
+      impactDelta: 0,
+    });
+  }
+
+  if (mod.id === 'alternate-current' && withoutSet.has('radium-re-reforged')) {
+    interactions.push({
+      kind: 'context',
+      targetIds: ['radium-re-reforged'],
+      targetNames: ['Radium Re-Reforged'],
+      summary: 'Перекрывает редстоун-модуль Radium более быстрым графом; при отладке редких ванильных 0-tick схем можно отключить redstone в config/radium.properties',
+      impactDelta: 0,
+    });
+  }
+
+  if (mod.id === 'falling-blocks-fps-fix' && prefs?.useCreate) {
+    interactions.push({
+      kind: 'context',
+      targetIds: [],
+      targetNames: [],
+      summary: 'В Create-сборках с крупными бурами/карьерами гравия и песка следите за порогом удаления падающих блоков, чтобы не терять лишние сущности',
+      impactDelta: 0,
+    });
+  }
+
+  if (mod.id === 'particle-core' && withoutSet.has('asyncparticles')) {
+    addOverlap(['asyncparticles'], 'Particle Core уже берёт на себя отсечение и оптимизацию частиц — AsyncParticles дублирует работу и повышает риск мерцания в Botania', -60);
+  } else if (mod.id === 'asyncparticles' && withoutSet.has('particle-core')) {
+    addOverlap(['particle-core'], 'Перекрывается Particle Core: одновременный многопоточный тикинг и куллинг частиц создаёт риск артефактов', -120);
+  }
+
+  if (mod.id === 'immersive-optimization') {
+    addOverlap(['entitysleep', 'enttick', 'sleepium', 'martensite-entity-tick-skiper'], 'Immersive Optimization уже адаптивно замедляет тики дальних мобов без сторонних скипперов', -50);
+  } else if (['entitysleep', 'enttick', 'sleepium', 'martensite-entity-tick-skiper'].includes(mod.id) && withoutSet.has('immersive-optimization')) {
+    addOverlap(['immersive-optimization'], 'Перекрыт Immersive Optimization: дополнительный пропуск тиков сущностей не требуется', -120);
+  }
+
+  const withoutHasAnyC2ME =
+    withoutSet.has('concurrent-chunk-management-engine-forge-c2me') ||
+    withoutSet.has('c2me-concurrent-chunk-management-engine') ||
+    withoutSet.has('c2mer');
+  if (mod.id === 'delta-chunk' && (withoutHasAnyC2ME || withoutSet.has('parallel-world-save'))) {
+    addOverlap(
+      withoutHasAnyC2ME
+        ? ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer']
+        : ['parallel-world-save'],
+      'Конкуренция перехватчиков записи чанков на диск — оставьте основной асинхронный движок без Delta Chunk',
+      -120
+    );
+  } else if (mod.id === 'parallel-world-save' && (withoutHasAnyC2ME || withoutSet.has('delta-chunk'))) {
+    addOverlap(
+      withoutHasAnyC2ME
+        ? ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer']
+        : ['delta-chunk'],
+      'Пересечение асинхронного сохранения мира с C2ME / Delta Chunk на уровне записи регионов чанков',
+      -90
+    );
+  }
+
+  if (mod.id === 'resourcepackcached' && (withoutSet.has('keep-the-resourcepack') || withoutSet.has('packforge'))) {
+    addOverlap(['keep-the-resourcepack', 'packforge'], 'ResourcePackCached уже кэширует распакованные паки на диске — второй кэшер ресурс-паков лишний', -40);
+  } else if ((mod.id === 'keep-the-resourcepack' || mod.id === 'packforge') && withoutSet.has('resourcepackcached')) {
+    addOverlap(['resourcepackcached'], 'Перекрыт ResourcePackCached: дублирование кэша ZIP ресурс-паков при запуске', -100);
+  } else if (mod.id === 'keep-the-resourcepack' && withoutSet.has('packforge')) {
+    addOverlap(['packforge'], 'Пересекается с PackForge на этапе распаковки текстурпаков (оставьте один, лучше ResourcePackCached)', -60);
+  } else if (mod.id === 'packforge' && withoutSet.has('keep-the-resourcepack')) {
+    addOverlap(['keep-the-resourcepack'], 'Пересекается с Keep The ResourcePack на этапе распаковки текстурпаков (оставьте один)', -90);
+  }
+
+  if (mod.id === 'zstdnet') {
+    interactions.push({
+      kind: 'context',
+      targetIds: [],
+      targetNames: [],
+      summary: 'Протокольный нюанс: ZSTDNET обязан стоять и на сервере, и у каждого клиента (несовместим с ванильным входом и встроенным Zstd в Krypton Hybrid)',
+      impactDelta: -30,
+    });
+  }
+
+  if (mod.id === 'chunky') {
+    if (withoutHasAnyC2ME) {
+      addSynergy(
+        ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer'],
+        'В паре с C2ME многопоточно ускоряет команду /chunky start при предгенерации карты',
+        110
+      );
+    }
+    if (withoutSet.has('distant-horizons')) {
+      interactions.push({
+        kind: 'context',
+        targetIds: ['distant-horizons'],
+        targetNames: ['Distant Horizons'],
+        summary: 'На время предгенерации /chunky start отключайте фоновую генерацию LOD Distant Horizons, чтобы не делить потоки CPU и I/O диска',
+        impactDelta: 0,
+      });
+    }
+  }
+
+  if (mod.id === 'entity-culling' && (prefs?.useCreate || withoutSet.has('oculus') || withoutSet.has('emberlens'))) {
+    interactions.push({
+      kind: 'context',
+      targetIds: ['oculus', 'emberlens'].filter(id => withoutSet.has(id)),
+      targetNames: ['oculus', 'emberlens'].filter(id => withoutSet.has(id)).map(id => MOD_BY_ID.get(id)?.name || id),
+      summary: 'При мерцании крупных механизмов Create, терминалов хранения или теней за углом внесите их блок-сущности в blockEntityWhitelist (config/entityculling.json)',
+      impactDelta: 0,
+    });
+  }
+
+  if (mod.id === 'badoptimizations' && (withoutSet.has('oculus') || withoutSet.has('emberlens') || prefs?.useShaders)) {
+    interactions.push({
+      kind: 'context',
+      targetIds: ['oculus', 'emberlens'].filter(id => withoutSet.has(id)),
+      targetNames: ['oculus', 'emberlens'].filter(id => withoutSet.has(id)).map(id => MOD_BY_ID.get(id)?.name || id),
+      summary: 'Если шейдеры или моды на погоду меняют цвет неба рывками, установите enable_sky_color_caching=false в config/badoptimizations.txt',
+      impactDelta: 0,
+    });
+  }
+
+  if (mod.id === 'let-me-despawn' && withoutSet.has('almanac')) {
+    interactions.push({
+      kind: 'context',
+      targetIds: ['almanac'],
+      targetNames: ['Almanac Lib'],
+      summary: 'Мобы с бирками защищены, а подобранные редкие предметы при деспавне выбрасываются на землю (редких боссов можно защитить в config/letmedespawn.json)',
+      impactDelta: 0,
+    });
   }
 
   // Hardware / scenario caveats
@@ -3939,7 +4398,9 @@ export function evaluateModImpactInPack(
       kind: 'context',
       targetIds: [],
       targetNames: [],
-      summary: 'Заметен при быстрой разведке карты / элитрах и 8+ ядрах CPU; на 4–6 потоках или слабой ОЗУ риск фризов',
+      summary: withoutSet.has('distant-horizons')
+        ? 'Заметен при быстрой разведке на 8+ ядрах CPU; в паре с Distant Horizons ограничьте потоки LOD, чтобы избежать статтеров'
+        : 'Заметен при быстрой разведке карты / элитрах и 8+ ядрах CPU; на 4–6 потоках или слабой ОЗУ риск фризов',
       impactDelta: 0,
     });
   } else if ((mod.id === 'geckolib-animation-optimizer' || mod.id === 'geckolibbetterfps') && !withoutSet.has('geckolib')) {
@@ -4005,7 +4466,17 @@ export function evaluateModImpactInPack(
       level = 'zero';
       label = 'Без Fabric-модов (0%)';
       summary = 'В сборке нет Fabric-модов — прослойка только замедляет запуск';
-    } else if (mod.id === 'matlib' || mod.id === 'cupboard' || mod.id === 'sodium-embeddium-options-api' || mod.id === 'fzzy-config') {
+    } else if (
+      mod.id === 'matlib' ||
+      mod.id === 'cupboard' ||
+      mod.id === 'sodium-embeddium-options-api' ||
+      mod.id === 'fzzy-config' ||
+      mod.id === 'puzzles-lib' ||
+      mod.id === 'almanac' ||
+      mod.id === 'placebo' ||
+      mod.id === 'architectury-api' ||
+      mod.id === 'rinlib'
+    ) {
       level = 'zero';
       label = 'Нет потребителя (0%)';
       summary = 'В текущем списке нет оптимизатора, которому нужна эта библиотека';

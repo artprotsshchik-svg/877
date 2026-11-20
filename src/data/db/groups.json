@@ -785,7 +785,12 @@
       "kotlin-for-forge",
       "matlib",
       "geckolib",
-      "minimal-backup-zstd"
+      "minimal-backup-zstd",
+      "puzzles-lib",
+      "almanac",
+      "placebo",
+      "architectury-api",
+      "rinlib"
     ],
     "memberIds": [
       "geckolib-animation-optimizer",
@@ -803,6 +808,11 @@
       "kotlin-for-forge",
       "matlib",
       "geckolib",
+      "puzzles-lib",
+      "almanac",
+      "placebo",
+      "architectury-api",
+      "rinlib",
       "rubidium-fluid-render-fix",
       "anotherfix",
       "crash-doctor",

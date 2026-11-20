@@ -114,6 +114,17 @@ const JAR_ALIASES: Record<string, string> = {
   optifine: 'optifine',
   rubidium: 'rubidium',
   xenon: 'xenon',
+  puzzleslib: 'puzzles-lib',
+  almanac: 'almanac',
+  almanaclib: 'almanac',
+  placebo: 'placebo',
+  architectury: 'architectury-api',
+  architecturyapi: 'architectury-api',
+  rinlib: 'rinlib',
+  papi: 'put-a-plug-in-it-papi',
+  putapluginit: 'put-a-plug-in-it-papi',
+  fallingblocksfpsfix: 'falling-blocks-fps-fix',
+  structuredfucache: 'structure-dfu-cache',
 };
 
 const MOD_TOKEN_INDEX = (() => {

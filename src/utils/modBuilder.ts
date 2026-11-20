@@ -277,12 +277,19 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
       'stutterfix-reforged',
       'threadtweak-reforged',
       'lightspeedre',
-      'fastsuite',
       'fast-item-frames',
       'immersive-optimization',
       'fast-sounds',
       'soundgc',
     ].forEach(id => ids.add(id));
+    if (recipeViewer === 'none') {
+      ids.add('fastsuite');
+    } else {
+      excluded.push({
+        name: 'FastSuite',
+        reason: 'Несовместим с Fast Recipe Search (при активном JEI/EMI предпочтителен хэш-индекс поиска рецептов).',
+      });
+    }
     if (!isPotato) {
       ids.add('particle-core');
       excluded.push({ name: 'PartiCull', reason: 'Полностью перекрыт Particle Core в максимальной сборке.' });
@@ -291,7 +298,11 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
       excluded.push({ name: 'ServerCore / Connectivity / Cupboard', reason: 'Сетевые моды исключены в одиночном режиме (в соло не дают прироста).' });
     }
     excluded.push({ name: 'RestMode / More Culling / Better Biome Reblend', reason: 'Исключены из-за наложения с Dynamic FPS / CullLessLeaves и архивации Better Biome Reblend.' });
-    notes.push('Для максимальной сборки добавлены высокоэффективные моды без раздувания миксинов: Kerria, LightStar, Particle Core, FastSuite (нужен Placebo), Structure DFU/Layout, Immersive Optimization, Falling Blocks FPS Fix, StutterFix + ThreadTweak и Fast Item Frames.');
+    notes.push(
+      `Для максимальной сборки добавлены высокоэффективные моды без раздувания миксинов: Kerria, LightStar, Particle Core, ${
+        recipeViewer === 'none' ? 'FastSuite (+ Placebo), ' : ''
+      }Structure DFU (+ RinLib)/Layout, Immersive Optimization, Falling Blocks FPS Fix, StutterFix + ThreadTweak и Fast Item Frames (+ Puzzles Lib).`
+    );
   } else {
     excluded.push({ name: 'FastSuite / Structure DFU Cache', reason: 'Опциональные кеши для тяжёлых сборок пропущены в лёгком/сбалансированном профиле.' });
   }
@@ -748,6 +759,84 @@ export function smartFixAssembly(selectedIds: string[], prefs?: AssemblyPreferen
     if (focusId === 'restmode') next.delete('dynamic-fps');
     else next.delete('restmode');
   }
+  if (next.has('fast-recipe-search') && next.has('fastsuite')) {
+    if (focusId === 'fastsuite') next.delete('fast-recipe-search');
+    else next.delete('fastsuite');
+  }
+  if (next.has('prismanium') && next.has('sodium-embeddium-dynamic-lights')) {
+    if (focusId === 'sodium-embeddium-dynamic-lights') next.delete('prismanium');
+    else next.delete('sodium-embeddium-dynamic-lights');
+  }
+  if (next.has('distant-horizons')) {
+    if (next.has('bobby-reforged')) {
+      if (focusId === 'bobby-reforged') next.delete('distant-horizons');
+      else next.delete('bobby-reforged');
+    }
+    if (next.has('farsight')) {
+      if (focusId === 'farsight') next.delete('distant-horizons');
+      else next.delete('farsight');
+    }
+  }
+  if (next.has('servercore')) {
+    for (const adaptiveId of ['adaptive-performance-tweaks', 'adaptive-optimization-reborn'] as const) {
+      if (next.has(adaptiveId)) {
+        if (focusId === adaptiveId) next.delete('servercore');
+        else next.delete(adaptiveId);
+      }
+    }
+  }
+  if (next.has('mob-collision-off')) {
+    for (const colId of ['farmcollisionless', 'entity-collision-optimization'] as const) {
+      if (next.has(colId)) {
+        if (focusId === colId) next.delete('mob-collision-off');
+        else next.delete(colId);
+      }
+    }
+  }
+  if (next.has('particle-core') && next.has('asyncparticles')) {
+    if (focusId === 'asyncparticles') next.delete('particle-core');
+    else next.delete('asyncparticles');
+  }
+  if (next.has('immersive-optimization')) {
+    for (const sleepId of ['entitysleep', 'enttick', 'sleepium', 'martensite-entity-tick-skiper'] as const) {
+      if (next.has(sleepId)) {
+        if (focusId === sleepId) next.delete('immersive-optimization');
+        else next.delete(sleepId);
+      }
+    }
+  }
+  const hasC2meInNext =
+    next.has('concurrent-chunk-management-engine-forge-c2me') ||
+    next.has('c2me-concurrent-chunk-management-engine') ||
+    next.has('c2mer');
+  if (hasC2meInNext) {
+    for (const saveId of ['parallel-world-save', 'delta-chunk'] as const) {
+      if (next.has(saveId)) {
+        if (focusId === saveId) {
+          next.delete('concurrent-chunk-management-engine-forge-c2me');
+          next.delete('c2me-concurrent-chunk-management-engine');
+          next.delete('c2mer');
+        } else {
+          next.delete(saveId);
+        }
+      }
+    }
+  }
+  if (next.has('parallel-world-save') && next.has('delta-chunk')) {
+    if (focusId === 'delta-chunk') next.delete('parallel-world-save');
+    else next.delete('delta-chunk');
+  }
+  if (next.has('resourcepackcached')) {
+    for (const rpId of ['keep-the-resourcepack', 'packforge'] as const) {
+      if (next.has(rpId)) {
+        if (focusId === rpId) next.delete('resourcepackcached');
+        else next.delete(rpId);
+      }
+    }
+  } else if (next.has('keep-the-resourcepack') && next.has('packforge')) {
+    if (focusId === 'packforge') next.delete('keep-the-resourcepack');
+    else next.delete('packforge');
+  }
 
   for (const id of Array.from(next)) {
     if (focusId && id === focusId) continue;
@@ -850,6 +939,11 @@ export function smartFixAssembly(selectedIds: string[], prefs?: AssemblyPreferen
     ['fzzy-config', LIBRARY_CONSUMER_MAP['fzzy-config']],
     ['resourceful-config', LIBRARY_CONSUMER_MAP['resourceful-config']],
     ['sodium-embeddium-options-api', LIBRARY_CONSUMER_MAP['sodium-embeddium-options-api']],
+    ['puzzles-lib', LIBRARY_CONSUMER_MAP['puzzles-lib']],
+    ['almanac', LIBRARY_CONSUMER_MAP['almanac']],
+    ['placebo', LIBRARY_CONSUMER_MAP['placebo']],
+    ['architectury-api', LIBRARY_CONSUMER_MAP['architectury-api']],
+    ['rinlib', LIBRARY_CONSUMER_MAP['rinlib']],
     ['accelerated-recoiling', ['accelerated-rendering', 'accelerated-rendering-turned']],
   ];
   for (const [libId, consumers] of strictSinglePurposeLibs) {
@@ -927,6 +1021,11 @@ export function toggleModSmart(
       ['fzzy-config', LIBRARY_CONSUMER_MAP['fzzy-config']],
       ['resourceful-config', LIBRARY_CONSUMER_MAP['resourceful-config']],
       ['sodium-embeddium-options-api', LIBRARY_CONSUMER_MAP['sodium-embeddium-options-api']],
+      ['puzzles-lib', LIBRARY_CONSUMER_MAP['puzzles-lib']],
+      ['almanac', LIBRARY_CONSUMER_MAP['almanac']],
+      ['placebo', LIBRARY_CONSUMER_MAP['placebo']],
+      ['architectury-api', LIBRARY_CONSUMER_MAP['architectury-api']],
+      ['rinlib', LIBRARY_CONSUMER_MAP['rinlib']],
     ];
     for (const [libId, consumers] of singlePurposeLibs) {
       if (next.has(libId) && consumers.some(c => removedIdSet.has(c)) && !consumers.some(c => next.has(c))) {
@@ -1106,6 +1205,11 @@ export function toggleModSmart(
       ['fzzy-config', LIBRARY_CONSUMER_MAP['fzzy-config']],
       ['resourceful-config', LIBRARY_CONSUMER_MAP['resourceful-config']],
       ['sodium-embeddium-options-api', LIBRARY_CONSUMER_MAP['sodium-embeddium-options-api']],
+      ['puzzles-lib', LIBRARY_CONSUMER_MAP['puzzles-lib']],
+      ['almanac', LIBRARY_CONSUMER_MAP['almanac']],
+      ['placebo', LIBRARY_CONSUMER_MAP['placebo']],
+      ['architectury-api', LIBRARY_CONSUMER_MAP['architectury-api']],
+      ['rinlib', LIBRARY_CONSUMER_MAP['rinlib']],
     ];
     for (const [libId, consumers] of singlePurposeLibs) {
       if (libId !== modId && next.has(libId) && consumers.some(c => evictedIds.has(c)) && !consumers.some(c => next.has(c))) {
@@ -1174,6 +1278,11 @@ export function removeModsCascade(currentIds: string[], removeIds: string[]): { 
     ['fzzy-config', LIBRARY_CONSUMER_MAP['fzzy-config']],
     ['resourceful-config', LIBRARY_CONSUMER_MAP['resourceful-config']],
     ['sodium-embeddium-options-api', LIBRARY_CONSUMER_MAP['sodium-embeddium-options-api']],
+    ['puzzles-lib', LIBRARY_CONSUMER_MAP['puzzles-lib']],
+    ['almanac', LIBRARY_CONSUMER_MAP['almanac']],
+    ['placebo', LIBRARY_CONSUMER_MAP['placebo']],
+    ['architectury-api', LIBRARY_CONSUMER_MAP['architectury-api']],
+    ['rinlib', LIBRARY_CONSUMER_MAP['rinlib']],
   ];
   for (const [libId, consumers] of singlePurposeLibs) {
     if (next.has(libId) && consumers.some(c => removedIdSet.has(c)) && !consumers.some(c => next.has(c))) {

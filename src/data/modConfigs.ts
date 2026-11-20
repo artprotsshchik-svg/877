@@ -96,4 +96,99 @@ mode = "OFF"`,
   "maxParticles": 4000
 }`,
   },
+  {
+    modId: 'gputape',
+    modName: 'GPUTape',
+    filePath: 'config/gputape.toml',
+    title: 'Безопасная очистка VRAM вместе с шейдерами Oculus / Emberlens',
+    note: 'Режим RBO depth ломает буферы глубины шейдерпаков — держите его выключенным при игре с Oculus.',
+    content: `[experimental]
+useRboDepth = false`,
+  },
+  {
+    modId: 'immediatelyfast',
+    modName: 'ImmediatelyFast',
+    filePath: 'config/immediatelyfast.json',
+    title: 'Тонкая настройка батчинга при работе с Oculus и тяжёлым HUD',
+    note: 'Если с шейдерами Oculus мерцает HUD, шрифт или таблички, отключите hud_batching или sign_text_buffering.',
+    content: `{
+  "hud_batching": true,
+  "font_atlas_resizing": true,
+  "map_atlas_generation": true,
+  "experimental_sign_text_buffering": false
+}`,
+  },
+  {
+    modId: 'radium-re-reforged',
+    modName: 'Radium Re-Reforged',
+    filePath: 'config/radium.properties',
+    title: 'Совместимость редстоуна (при использовании Alternate Current / сложных схем)',
+    note: 'Если установлен Alternate Current или есть редкий редстоун-механизм на точных таймингах, модуль redstone в Radium можно отключить.',
+    content: `mixin.block.redstone=false`,
+  },
+  {
+    modId: 'distant-horizons',
+    modName: 'Distant Horizons',
+    filePath: 'config/DistantHorizons.toml',
+    title: 'Снижение нагрузки на CPU при совместной работе с C2ME',
+    note: 'При одновременной работе Distant Horizons и C2ME ограничьте нагрузку на процессор до BALANCED или LOW_IMPACT, чтобы избежать микростаттеров.',
+    content: `[client.advanced.multiThreading]
+numberOfThreads = 2
+threadPriority = "BALANCED"`,
+  },
+  {
+    modId: 'entity-culling',
+    modName: 'Entity Culling',
+    filePath: 'config/entityculling.json',
+    title: 'Белый список механизмов Create и контейнеров при мерцании за стенами',
+    note: 'Если крупные механизмы Create, терминалы хранилищ или таблички на секунду пропадают при повороте камеры, добавьте их ID в blockEntityWhitelist.',
+    content: `{
+  "configVersion": 5,
+  "renderNametagsThroughWalls": true,
+  "blockEntityWhitelist": [
+    "minecraft:beacon",
+    "create:belt",
+    "create:flywheel"
+  ],
+  "tickCulling": true
+}`,
+  },
+  {
+    modId: 'badoptimizations',
+    modName: 'BadOptimizations',
+    filePath: 'config/badoptimizations.txt',
+    title: 'Отключение кэша цвета неба при багах с шейдерами или погодными модами',
+    note: 'Если с шейдерами или модами на погоду небо меняет цвет рывками, отключите enable_sky_color_caching, оставив остальные микро-оптимизации.',
+    content: `enable_sky_color_caching=false
+enable_toast_optimizations=true
+enable_lightmap_caching=true`,
+  },
+  {
+    modId: 'servercore',
+    modName: 'ServerCore',
+    filePath: 'config/servercore/config.toml',
+    title: 'Сбалансированная динамика тиков без урезания ближних ферм',
+    note: 'Оставляет адаптивное снижение нагрузки на TPS при перегрузе сервера, не зажимая радиус активации прямо у базы игрока.',
+    content: `[dynamic]
+enabled = true
+target_mspt = 35
+min_chunk_tick_distance = 5
+min_simulation_distance = 6`,
+  },
+  {
+    modId: 'let-me-despawn',
+    modName: 'Let Me Despawn',
+    filePath: 'config/letmedespawn.json',
+    title: 'Защита именных мобов и редких боссов от раннего деспавна с лутом',
+    note: 'По умолчанию мобы с бирками и так защищены; дополнительно можно исключить модовых боссов, чтобы они не пропадали при отходе игрока.',
+    content: `{
+  "despawnTimer": 600,
+  "pickUpItems": true,
+  "mobNames": [
+    "minecraft:ender_dragon",
+    "minecraft:wither"
+  ]
+}`,
+  },
 ];
+

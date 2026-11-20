@@ -255,7 +255,7 @@ export function ModDetailModal({
             {groupInfo?.leader &&
               groupInfo.leader.id !== mod.id &&
               (groupInfo.group.exclusive ||
-                groupInfo.addonIds.includes(mod.id) ||
+                groupInfo.group.addonIds.includes(mod.id) ||
                 mod.status === 'outdated' ||
                 mod.status === 'redundant' ||
                 mod.status === 'danger' ||
