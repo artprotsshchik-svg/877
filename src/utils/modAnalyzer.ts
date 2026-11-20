@@ -191,6 +191,7 @@ export const MOD_HARD_DEPENDENCIES: Record<string, string[]> = {
   'just-enough-freezes': ['just-enough-items-jei'],
   'just-enough-threads': ['just-enough-items-jei'],
   'jeir-jei-rewired': ['just-enough-items-jei'],
+  'controlling': ['searchables'],
 };
 
 export const MOD_ALTERNATIVE_DEPENDENCIES: Record<string, string[][]> = {
@@ -226,6 +227,9 @@ const PURE_LIBRARY_MOD_IDS = new Set([
   'placebo',
   'architectury-api',
   'rinlib',
+  'configured',
+  'controlling',
+  'searchables',
 ]);
 
 export function findModByDisplayName(name: string): ModItem | undefined {
@@ -1145,7 +1149,9 @@ export function getCheckerTier(
     mod.id === 'bons-dlss-diet-complementary-unbound' ||
     mod.id === 'ksyxis' ||
     mod.id === 'better-tnt' ||
-    mod.id === 'perfomant-boom';
+    mod.id === 'perfomant-boom' ||
+    mod.id === 'zstdnet' ||
+    mod.id === 'asyncparticles';
 
   const hasBetterReplacement = Boolean(mod.supersededBy && mod.supersededBy.length > 0);
   const isSuitableNative =
@@ -2529,6 +2535,27 @@ export function getModResourceProfile(mod: ModItem): ModResourceProfile {
     };
   }
 
+  if (mod.id === 'configured' || mod.id === 'controlling') {
+    return {
+      gains: [
+        mod.id === 'configured'
+          ? 'Внутриигровой редактор config/* через меню Mods'
+          : 'Поиск и фильтр конфликтов клавиш в меню управления',
+      ],
+      costs: ['На FPS/TPS не влияет (чистый QoL-интерфейс)'],
+      shortTag: 'QoL-интерфейс (0% FPS) · без нагрузки ПК',
+      hasTradeoff: false,
+      gpuLoad: 0,
+      vramLoad: 0,
+      cpuLoad: 0,
+      ramLoad: 0,
+      tradeoffNote:
+        mod.id === 'configured'
+          ? 'Упрощает настройку конфигов прямо в игре; в самой отрисовке мира не участвует.'
+          : 'Удобный поиск биндов поверх Searchables; не нагружает ни CPU, ни GPU.',
+    };
+  }
+
   if (PURE_LIBRARY_MOD_IDS.has(mod.id) || SINYTRA_BRIDGE_IDS.has(mod.id)) {
     const isBridge = SINYTRA_BRIDGE_IDS.has(mod.id);
     return {
@@ -2748,6 +2775,7 @@ export const LIBRARY_CONSUMER_MAP: Record<string, string[]> = {
   'placebo': ['fastsuite', 'fastfurnace', 'fastworkbench'],
   'architectury-api': ['observable'],
   'rinlib': ['structure-dfu-cache'],
+  'searchables': ['controlling'],
 };
 
 export const SINYTRA_BRIDGE_IDS = new Set(['sinytra-connector', 'forgified-fabric-api', 'connector-extras']);
@@ -4020,6 +4048,8 @@ export function evaluateModImpactInPack(
     addSynergy(['ferritecore', 'alltheleaks-memory-leak-fix', 'jasione'], 'В связке с FerriteCore / AllTheLeaks снижает RAM на 35–50% и закрывает утечки памяти', 180);
   } else if (mod.id === 'ferritecore') {
     addSynergy(['modernfix', 'alltheleaks-memory-leak-fix'], 'Вместе с ModernFix даёт максимальную экономию ОЗУ на моделях и блоках', 150);
+  } else if (mod.id === 'capability-fix-revived') {
+    addSynergy(['modernfix', 'alltheleaks-memory-leak-fix'], 'Срезает лишние аллокации и утечки Forge Capabilities при частых тиках механизмов и мобов', 110);
   } else if (
     mod.id === 'alltheleaks-memory-leak-fix' ||
     mod.id === 'jasione' ||
@@ -4035,7 +4065,7 @@ export function evaluateModImpactInPack(
   if (mod.id === 'embeddium' || mod.id === 'emberbium') {
     addSynergy(['flerovium', 'immediatelyfast', 'kerria', 'sodium-chloride'], 'Аддоны дополняют рендер чанков: предметы/частицы, HUD/GUI и кэш анимаций текстур GPU', 160);
     if (mod.id === 'emberbium' && withoutSet.has('nvidium')) {
-      addSynergy(['nvidium'], 'Radix-сортировка Emberbium + NVIDIA Mesh Shaders Nvidium дают потолок FPS без шейдеров', 220);
+      addSynergy(['nvidium'], 'Radix-сортировка Emberbium + NVIDIA Mesh Shaders Nvidium дают потолок FPS без шейдеров (через .connector)', 220);
     }
   } else if (mod.id === 'flerovium') {
     addSynergy(['embeddium', 'emberbium'], 'Ускоряет рендер предметов (+50%), частиц (+50%) и сущностей (+30%), не дублируя рендерер чанков', 160);
@@ -4043,12 +4073,14 @@ export function evaluateModImpactInPack(
     addSynergy(['embeddium', 'emberbium', 'kerria'], 'Закрывает Immediate-Mode (текст, HUD, 2D-частицы, GUI) поверх рендера чанков и кэша текстур', 140);
   } else if (mod.id === 'kerria') {
     addSynergy(['embeddium', 'emberbium', 'immediatelyfast'], 'Кэширует неинтерполированные анимации текстур на GPU (огонь, вода, порталы), убирая фризы glTexSubImage2D', 150);
+  } else if (mod.id === 'gputape') {
+    addSynergy(['emberbium', 'embeddium', 'nvidium', 'alloyium'], 'Очищает устаревшие GPU/OpenGL-буферы и страхует от переполнения 4 ГБ VRAM при смене миров и пролётах', 110);
   } else if (mod.id === 'shadowlod' && (withoutSet.has('oculus') || withoutSet.has('emberlens'))) {
     addSynergy(['oculus', 'emberlens', 'faster-iris-shadow-mapper'], 'Снижает стоимость далёких проходов теней в шейдерах без заметной потери детализации вблизи', 130);
   } else if (mod.id === 'nvidium') {
     addSynergy(['embeddium', 'emberbium'], 'Разгружает геометрию далёких чанков в Mesh Shaders NVIDIA GTX 16xx/RTX (+3×–10× FPS без шейдеров)', 240);
   } else if (mod.id === 'alloyium') {
-    addSynergy(['embeddium'], 'Ускоряет видимость чанков на GPU через OpenGL Compute; полностью совместим с Oculus', 130);
+    addSynergy(['embeddium'], 'Ускоряет видимость чанков на GPU через OpenGL Compute; полностью совместим с Oculus и работает без Sinytra', 130);
   } else if (mod.id === 'accelerated-rendering') {
     if (hasRenderCore) {
       interactions.push({
@@ -4073,7 +4105,9 @@ export function evaluateModImpactInPack(
 
   // Culling 3-layer synergy
   if (mod.id === 'entity-culling') {
-    addSynergy(['culllessleaves-reforged', 'enhanced-block-entities-reloaded', 'more-culling-reforged'], 'Трёхслойный куллинг: сущности за стенами + кроны листвы + запечённые сундуки', 140);
+    addSynergy(['culllessleaves-reforged', 'enhanced-block-entities-reloaded', 'more-culling-reforged'], 'Трёхслойный куллинг: сущности за стенами + невидимые грани/рамки + запечённые сундуки', 140);
+  } else if (mod.id === 'enhanced-block-entities-reloaded') {
+    addSynergy(['matlib', 'entity-culling', 'fast-item-frames'], 'Запекает сундуки, таблички и кровати в статические чанки (через MatLib), разгружая Entity Culling и рамки', 120);
   } else if (mod.id === 'more-culling-reforged') {
     addSynergy(['entity-culling'], 'Дополняет Entity Culling отсечением невидимых граней блоков и рамок', 90);
     addOverlap(['culllessleaves-reforged'], 'При наличии CullLessLeaves Reforged оставьте куллинг листвы за ним (в More Culling отключите листву)', -60);
@@ -4084,6 +4118,10 @@ export function evaluateModImpactInPack(
   // TPS / Farm / Create / GeckoLib synergy
   if (mod.id === 'radium-re-reforged') {
     addSynergy(['immersive-optimization', 'clumps', 'badoptimizations', 'falling-blocks-fps-fix'], 'Связка для TPS: физика Lithium + троттлинг ИИ мобов + объединение опыта + оптимизация сыпучих блоков', 160);
+  } else if (mod.id === 'badoptimizations') {
+    addSynergy(['radium-re-reforged', 'fastvancements'], 'Кэширует свет, цвет неба, тосты и мелкие клиентские циклы, дополняя физику Radium и Fastvancements', 110);
+  } else if (mod.id === 'clumps') {
+    addSynergy(['let-me-despawn', 'radium-re-reforged'], 'Сливает сферы опыта в один орб на фермах мобов, дополняя безопасный деспавн Let Me Despawn и TPS-патчи Radium', 100);
   } else if (mod.id === 'falling-blocks-fps-fix') {
     addSynergy(['radium-re-reforged', 'entity-culling'], 'Предотвращает просадки FPS и TPS при одновременном обвале песка и гравия', 120);
   } else if (mod.id === 'immersive-optimization') {
@@ -4108,33 +4146,43 @@ export function evaluateModImpactInPack(
     addSynergy(['noisiumed', 'lightstar'], 'Многопоточный свет Solix + Noisiumed ускоряют генерацию и прогрузку чанков', 120);
   } else if (mod.id === 'lightstar') {
     addSynergy(['embeddium', 'emberbium'], 'Клиентский кэш света в Embeddium/Emberbium; безопасен даже в паре с Solix', 90);
+  } else if (mod.id === 'sodium-embeddium-options-api') {
+    addSynergy(['emberbium', 'embeddium', 'sodium-embeddium-dynamic-lights'], 'Связывает меню видео-настроек Emberbium/Embeddium с Sodium Dynamic Lights через общий OptionGUIConstructionEvent', 80);
+  } else if (mod.id === 'sodium-embeddium-dynamic-lights') {
+    addSynergy(['sodium-embeddium-options-api', 'emberbium', 'embeddium'], 'Добавляет динамический свет факелов/дропа поверх Emberbium/Embeddium и Options API без дублирования Chloride', 100);
   } else if (mod.id === 'fastload') {
     addSynergy(['ksyxis', 'modernfix'], 'Ускоряет загрузку первых чанков мира в паре с Ksyxis и ModernFix', 100);
   } else if (mod.id === 'ksyxis') {
     addSynergy(['fastload', 'modernfix'], 'Убирает прогрев спавна (в паре с Fastload даёт мгновенный вход; осторожно с автофермами на спавне)', 70);
   }
 
-  // CPU input & audio & LOD & recipes
+  // CPU input & audio & LOD & recipes & QoL
   if (mod.id === 'ixeris' && (withoutSet.has('stutterfix-reforged') || withoutSet.has('threadtweak-reforged'))) {
     addSynergy(['stutterfix-reforged', 'threadtweak-reforged'], 'Убирает статтеры ввода мыши и выравнивает фреймтайм потоков CPU', 110);
   }
   if (mod.id === 'threadtweak-reforged' && withoutSet.has('stutterfix-reforged')) {
     addSynergy(['stutterfix-reforged'], 'Приоритезация потоков дополняет контроль кадров StutterFix', 85);
-  } else if (mod.id === 'stutterfix-reforged' && withoutSet.has('threadtweak-reforged')) {
-    addSynergy(['threadtweak-reforged'], 'Согласует кадр с распределением потоков ThreadTweak', 85);
+  } else if (mod.id === 'stutterfix-reforged' && (withoutSet.has('threadtweak-reforged') || withoutSet.has('ixeris'))) {
+    addSynergy(['ixeris', 'threadtweak-reforged'], 'Согласует кадр с асинхронным вводом Ixeris и распределением потоков CPU', 95);
   }
-  if (mod.id === 'packet-fixer' && (withoutSet.has('connectivity') || withoutSet.has('krypton-reno'))) {
-    addSynergy(['connectivity', 'krypton-reno'], 'Укрепляет сетевой стек и лимиты пакетов/NBT в тяжёлых Forge-сборках', 90);
+  if (mod.id === 'packet-fixer') {
+    addSynergy(['connectivity', 'krypton-reno', 'modernfix'], 'Снимает лимиты размера NBT и сетевых пакетов Forge 1.20.1, предотвращая краши больших предметов и чанков даже в сингле', 90);
+  }
+  if (mod.id === 'fastvancements') {
+    addSynergy(['badoptimizations', 'modernfix'], 'Кэширует проверки дерева достижений без фризов при подборе лута и открытии рецептов', 85);
   }
   if (mod.id === 'dynamic-fps' && (withoutSet.has('restmode') || withoutSet.has('idle-boost'))) {
     addOverlap(['restmode', 'idle-boost'], 'Оба ограничивают FPS в фоне/простое — оставьте один Dynamic FPS', -70);
   } else if ((mod.id === 'restmode' || mod.id === 'idle-boost') && withoutSet.has('dynamic-fps')) {
     addOverlap(['dynamic-fps'], 'Перекрывается Dynamic FPS — достаточно одного мода для фонового режима', -90);
   }
-  if (mod.id === 'particle-core' && withoutSet.has('particull')) {
-    addOverlap(['particull'], 'Particle Core уже покрывает отсечение и батчинг частиц — Particull лишний', -50);
+  if (mod.id === 'particle-core') {
+    addSynergy(['flerovium', 'fzzy-config'], 'Отсекает и батчит невидимые частицы до рендера, усиливая GPU-пайплайн Flerovium (настраивается через Fzzy Config)', 90);
+    if (withoutSet.has('particull')) {
+      addOverlap(['particull'], 'Particle Core уже покрывает отсечение и батчинг частиц — Particull лишний', -50);
+    }
   } else if (mod.id === 'particull' && withoutSet.has('particle-core')) {
-    addOverlap(['particle-core'], 'Частично перекрыт более комплексным Particle Core', -80);
+    addOverlap(['particle-core'], 'Перекрыт более комплексным Particle Core', -80);
   }
   if (mod.id === 'accelerated-rendering' && withoutSet.has('flerovium')) {
     addSynergy(['flerovium'], 'Совместно ускоряют толпы мобов (Compute) и предметы/частицы (Flerovium), если хватает VRAM', 60);
@@ -4146,6 +4194,25 @@ export function evaluateModImpactInPack(
     addSynergy(['fast-sounds'], 'Дополняет Fast Sounds очисткой/оптимизацией буферов OpenAL и GC аудио-потока', 80);
   } else if (mod.id === 'reload-looping-sound-fix') {
     addSynergy(['fast-sounds'], 'Дополняет Fast Sounds исправлением обрыва зацикленных звуков при F3+T (MC-194284)', 80);
+  }
+  if (mod.id === 'configured') {
+    addSynergy(['cloth-config-v12', 'fzzy-config'], 'Позволяет редактировать конфиги модов прямо в меню Mods без перезапуска, дополняя Cloth Config и Fzzy Config', 40);
+  }
+  if (mod.id === 'controlling') {
+    addSynergy(['searchables'], 'Работает поверх Searchables для быстрого поиска и фильтра конфликтов клавиш в большой сборке', 40);
+  }
+  if (mod.id === 'sinytra-connector' && withoutSet.has('nvidium')) {
+    addSynergy(['nvidium', 'forgified-fabric-api', 'connector-extras'], 'Обеспечивает запуск Fabric-версии Nvidium на Forge (при старте автоматически создаёт кэш-папку .connector)', 120);
+  }
+  if (mod.id === 'compact-f3-plus' && hasRenderCore) {
+    const coreTargets = ['emberbium', 'embeddium', 'nvidium', 'alloyium'].filter(id => withoutSet.has(id));
+    interactions.push({
+      kind: 'context',
+      targetIds: coreTargets,
+      targetNames: coreTargets.map(id => MOD_BY_ID.get(id)?.name || id),
+      summary: 'Убирает информационный шум экрана F3 (показывает чистые FPS, VRAM/RAM и статус рендерера при отладке сборки)',
+      impactDelta: 0,
+    });
   }
   if (mod.id === 'advanced-loot-info-ali' && withoutSet.has('fastali')) {
     addSynergy(['fastali'], 'FastALI полностью убирает 10–20 сек. зависание ALI при входе в мир', 120);
@@ -4451,7 +4518,15 @@ export function evaluateModImpactInPack(
     label = 'Перекрыт (0%)';
     summary = activeSup?.reason ? `Лишний: ${activeSup.reason}` : `Уже встроен в ${mod.coveredBy}`;
   } else if (isLibrary) {
-    if (activeLibConsumers.length > 0) {
+    if (mod.id === 'configured' || mod.id === 'controlling') {
+      level = 'support';
+      label = mod.id === 'configured' ? 'QoL-конфигуратор' : 'QoL-управление';
+      summary =
+        interactions[0]?.summary ||
+        (mod.id === 'configured'
+          ? 'Редактор конфигов модов прямо из меню Mods; сам FPS не повышает'
+          : 'Поиск и фильтр конфликтов клавиш в меню управления');
+    } else if (activeLibConsumers.length > 0) {
       level = 'support';
       label = 'Опора для модов';
       summary = `Сам FPS не повышает, но нужен для работы: ${activeLibConsumers.join(', ')}`;
@@ -4475,11 +4550,12 @@ export function evaluateModImpactInPack(
       mod.id === 'almanac' ||
       mod.id === 'placebo' ||
       mod.id === 'architectury-api' ||
-      mod.id === 'rinlib'
+      mod.id === 'rinlib' ||
+      mod.id === 'searchables'
     ) {
       level = 'zero';
       label = 'Нет потребителя (0%)';
-      summary = 'В текущем списке нет оптимизатора, которому нужна эта библиотека';
+      summary = 'В текущем списке нет оптимизатора или QoL-мода, которому нужна эта библиотека';
     } else {
       level = 'support';
       label = 'Библиотека конфигов';

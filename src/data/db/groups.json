@@ -790,7 +790,10 @@
       "almanac",
       "placebo",
       "architectury-api",
-      "rinlib"
+      "rinlib",
+      "configured",
+      "controlling",
+      "searchables"
     ],
     "memberIds": [
       "geckolib-animation-optimizer",
@@ -813,6 +816,9 @@
       "placebo",
       "architectury-api",
       "rinlib",
+      "configured",
+      "controlling",
+      "searchables",
       "rubidium-fluid-render-fix",
       "anotherfix",
       "crash-doctor",

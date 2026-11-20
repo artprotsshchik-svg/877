@@ -125,6 +125,10 @@ const JAR_ALIASES: Record<string, string> = {
   putapluginit: 'put-a-plug-in-it-papi',
   fallingblocksfpsfix: 'falling-blocks-fps-fix',
   structuredfucache: 'structure-dfu-cache',
+  configured: 'configured',
+  controlling: 'controlling',
+  searchables: 'searchables',
+  clothconfig: 'cloth-config-v12',
 };
 
 const MOD_TOKEN_INDEX = (() => {
