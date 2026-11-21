@@ -1841,6 +1841,7 @@ test('Nvidium config has valid JSON without placeholder text and group exclusive
     recipeViewer: 'emi-jei',
     packScale: 'heavy',
     allowSinytra: false,
+    hideOutdatedUseless: false,
     focusModId: 'embeddium',
   };
   const hash = encodeShareHash({
@@ -2451,6 +2452,83 @@ test('extended co-work checks cover DimThread+C2ME, ZSTDNET+KryptonHybrid, explo
     );
   }
 });
+
+test('isOutdatedOrUselessMod, shouldHideMod toggle, and persistent hideOutdatedUseless preference work accurately', async () => {
+  const { isOutdatedOrUselessMod } = await import('./modAnalyzer.ts');
+  const { decodeShareHash, encodeShareHash, parsePersistedState } = await import('./persistence.ts');
+  const byId = new Map(MODS_DATABASE.map(m => [m.id, m]));
+  const emptySet = new Set<string>();
+
+  // Default preference hides danger, outdated, redundant, coveredBy, and superseded mods
+  assert.equal(INITIAL_BUILDER_PREFS.hideOutdatedUseless, true);
+  for (const outdatedOrUselessId of [
+    'memguard',
+    'rubidium',
+    'radium-reforged',
+    'stablecap-pacer-forge-1-19-2',
+    'cullify',
+    'fastboot',
+  ]) {
+    const mod = byId.get(outdatedOrUselessId);
+    assert.ok(mod, `Expected mod ${outdatedOrUselessId} in DB`);
+    assert.equal(
+      isOutdatedOrUselessMod(mod, emptySet, INITIAL_BUILDER_PREFS),
+      true,
+      `Expected ${outdatedOrUselessId} to be classified as outdated/useless`
+    );
+    assert.equal(
+      shouldHideMod(mod, emptySet, INITIAL_BUILDER_PREFS, {
+        hideIncompatible: false,
+        hideUselessCovered: true,
+      }),
+      true
+    );
+    assert.equal(
+      shouldHideMod(mod, emptySet, INITIAL_BUILDER_PREFS, {
+        hideIncompatible: false,
+        hideUselessCovered: false,
+      }),
+      false
+    );
+    // Selected mods remain visible even when hideUselessCovered is true
+    assert.equal(
+      shouldHideMod(mod, new Set([outdatedOrUselessId]), INITIAL_BUILDER_PREFS, {
+        hideIncompatible: false,
+        hideUselessCovered: true,
+      }),
+      false
+    );
+  }
+
+  // Neither canonical preset contains any outdated/useless mods
+  for (const preset of MOD_PRESETS) {
+    const pSet = new Set(preset.modIds);
+    for (const id of preset.modIds) {
+      const mod = byId.get(id)!;
+      assert.equal(
+        isOutdatedOrUselessMod(mod, pSet, { ...INITIAL_BUILDER_PREFS, ...preset.recommendedPrefs }),
+        false,
+        `Preset ${preset.id} mod ${id} should not be outdated/useless`
+      );
+    }
+  }
+
+  // Persistence & share hash round-trip for hideOutdatedUseless
+  const parsedFalse = parsePersistedState({
+    builderPrefs: { ...INITIAL_BUILDER_PREFS, hideOutdatedUseless: false },
+  });
+  assert.equal(parsedFalse?.builderPrefs?.hideOutdatedUseless, false);
+
+  const hash = encodeShareHash({
+    activeTab: 'catalog',
+    builderModIds: ['embeddium'],
+    checkedModIds: ['embeddium'],
+    builderPrefs: { ...INITIAL_BUILDER_PREFS, hideOutdatedUseless: false },
+  });
+  const decoded = decodeShareHash(hash);
+  assert.equal(decoded?.builderPrefs?.hideOutdatedUseless, false);
+});
+
 
 
 

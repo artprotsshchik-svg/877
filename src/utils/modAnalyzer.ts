@@ -1533,6 +1533,23 @@ export function isModIncompatibleWithSelection(
   return false;
 }
 
+export function isOutdatedOrUselessMod(
+  mod: ModItem,
+  selectedSet?: Set<string>,
+  prefs?: AssemblyPreferences
+): boolean {
+  if (
+    mod.status === 'danger' ||
+    mod.status === 'outdated' ||
+    mod.status === 'redundant' ||
+    Boolean(mod.coveredBy) ||
+    isUnsupportedOnForge(mod)
+  ) {
+    return true;
+  }
+  return getModSuperseder(mod, selectedSet, prefs, true) !== null;
+}
+
 export function shouldHideMod(
   mod: ModItem,
   selectedSet: Set<string>,
@@ -1540,10 +1557,8 @@ export function shouldHideMod(
   options: { hideIncompatible: boolean; hideUselessCovered: boolean }
 ): boolean {
   if (selectedSet.has(mod.id)) return false;
-  if (options.hideUselessCovered) {
-    if (mod.status === 'danger') return true;
-    if (isUnsupportedOnForge(mod)) return true;
-    if (getModSuperseder(mod, selectedSet, prefs, true) !== null) return true;
+  if (options.hideUselessCovered && isOutdatedOrUselessMod(mod, selectedSet, prefs)) {
+    return true;
   }
   if (options.hideIncompatible && isModIncompatibleWithSelection(mod, selectedSet, prefs)) {
     return true;

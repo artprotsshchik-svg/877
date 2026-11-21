@@ -174,7 +174,10 @@ export function CheckerTab({ checkedModIds, setCheckedModIds, prefs, onOpenDetai
       if (!matches) return false;
       if (
         hideIncompatibleSuggestions &&
-        shouldHideMod(m, checkedSet, effectivePrefs, { hideIncompatible: true, hideUselessCovered: true })
+        shouldHideMod(m, checkedSet, effectivePrefs, {
+          hideIncompatible: true,
+          hideUselessCovered: effectivePrefs.hideOutdatedUseless !== false,
+        })
       ) {
         return false;
       }
