@@ -282,7 +282,7 @@
       "memory-cleaning",
       "better-ram"
     ],
-    "conflictReason": "Клинеры памяти (System.gc) вызывают статтеры, а функции Redirected/MemoryLeakFix уже встроены в ModernFix."
+    "conflictReason": "Клинеры памяти (System.gc) вызывают статтеры; старые Redirected/Redirector заменяет Jasione, а MemoryLeakFix перекрыт связкой AllTheLeaks + ModernFix."
   },
   {
     "id": "lighting-engine",

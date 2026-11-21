@@ -1059,19 +1059,29 @@ test('deep mod logic audit: no false coveredBy substrings, no overbroad exclusiv
   assert.ok(fastEventsToggle.nextIds.includes('embeddium'));
   assert.ok(fastEventsToggle.nextIds.includes('fast-events'));
 
-  const tcpToggle = toggleModSmart(['krypton-reno'], 'tcp-nodeway', { strict: true });
-  assert.ok(tcpToggle.nextIds.includes('krypton-reno'));
-  assert.ok(tcpToggle.nextIds.includes('tcp-nodeway'));
+  const pingToggle = toggleModSmart(['krypton-reno'], 'better-ping-display', { strict: true });
+  assert.ok(pingToggle.nextIds.includes('krypton-reno'));
+  assert.ok(pingToggle.nextIds.includes('better-ping-display'));
+
+  const tcpSupersededToggle = toggleModSmart(['krypton-reno'], 'tcp-nodeway', { strict: true });
+  assert.ok(tcpSupersededToggle.nextIds.includes('krypton-reno'));
+  assert.ok(!tcpSupersededToggle.nextIds.includes('tcp-nodeway'));
+  assert.ok(
+    analyzeSelection(['krypton-reno', 'tcp-nodeway']).warnings.some(
+      w => w.modId === 'tcp-nodeway' && w.message.includes('Krypton Reno')
+    )
+  );
 
   const renderScaleToggle = toggleModSmart(['dynamic-fps'], 'renderscale', { strict: true });
   assert.ok(renderScaleToggle.nextIds.includes('dynamic-fps'));
   assert.ok(renderScaleToggle.nextIds.includes('renderscale'));
 
-  // smartFixAssembly preserves compatible utility tweaks alongside group leaders
-  const keptUtilities = smartFixAssembly(['embeddium', 'fast-events', 'radium-re-reforged', 'ai-improvements', 'krypton-reno', 'tcp-nodeway', 'dynamic-fps', 'renderscale']);
-  for (const id of ['embeddium', 'fast-events', 'radium-re-reforged', 'ai-improvements', 'krypton-reno', 'tcp-nodeway', 'dynamic-fps', 'renderscale']) {
+  // smartFixAssembly preserves compatible utility tweaks alongside group leaders while cleaning superseded tcp-nodeway
+  const keptUtilities = smartFixAssembly(['embeddium', 'fast-events', 'radium-re-reforged', 'ai-improvements', 'krypton-reno', 'better-ping-display', 'tcp-nodeway', 'dynamic-fps', 'renderscale']);
+  for (const id of ['embeddium', 'fast-events', 'radium-re-reforged', 'ai-improvements', 'krypton-reno', 'better-ping-display', 'dynamic-fps', 'renderscale']) {
     assert.ok(keptUtilities.includes(id), `smartFixAssembly dropped compatible mod ${id}`);
   }
+  assert.ok(!keptUtilities.includes('tcp-nodeway'));
 
   // Adding Chloride or LightStar to Emberbium+Nvidium keeps Emberbium & Nvidium intact (defaults to Embeddium only when empty)
   const emberChloride = toggleModSmart(['emberbium', 'sinytra-connector', 'forgified-fabric-api', 'nvidium'], 'sodium-chloride', { strict: true });
@@ -2747,4 +2757,69 @@ test('deep audit fixes: exact rule resolution, transitive superseder chains, Fas
   assert.ok(!jarMatch.matchedIds.includes('embeddium'), 'embeddiumplus must match sodium-chloride, not base embeddium');
   assert.ok(jarMatch.unmatchedJars.includes('rubidium-extra-0.5.4.4+mc1.20.1-build.131.jar'));
 });
+
+test('deep GitHub relationship audit: coveredBy resolution, transitive dep conflicts in analogs, cross-group soft overlaps, and supersededWhenAll eviction', async () => {
+  const { MODS_DATABASE } = await import('../data/modsData.ts');
+  const {
+    analyzeSelection,
+    getModAnalogsComparison,
+    matchesCoveredByName,
+    PURE_LIBRARY_MOD_IDS,
+  } = await import('./modAnalyzer.ts');
+  const { toggleModSmart } = await import('./modBuilder.ts');
+
+  const byId = new Map(MODS_DATABASE.map(m => [m.id, m]));
+
+  // 1. memory-leak-fix-modern-port coveredBy matches BOTH AllTheLeaks (Memory Leak Fix) and ModernFix
+  const mlfPort = byId.get('memory-leak-fix-modern-port')!;
+  assert.equal(matchesCoveredByName(mlfPort.coveredBy, 'AllTheLeaks (Memory Leak Fix)'), true);
+  assert.equal(matchesCoveredByName(mlfPort.coveredBy, 'ModernFix'), true);
+  const mlfAnalogs = getModAnalogsComparison(mlfPort, new Set(['memory-leak-fix-modern-port']));
+  const atlEntry = mlfAnalogs.find(e => e.mod.id === 'alltheleaks-memory-leak-fix');
+  assert.equal(atlEntry?.relation, 'builtin-covered');
+  assert.equal(atlEntry?.canUseTogether, false);
+
+  // 2. tcp-nodeway -> krypton-reno and iris-shaders -> oculus superseder links
+  assert.ok(byId.get('tcp-nodeway')!.supersededBy?.includes('krypton-reno'));
+  assert.ok(byId.get('iris-shaders')!.supersededBy?.includes('oculus'));
+
+  // 3. Adding particle-core evicts supersededWhenAll/soft-overlapping particull cleanly
+  const partEvict = toggleModSmart(['embeddium', 'particull'], 'particle-core', { strict: true });
+  assert.ok(partEvict.nextIds.includes('particle-core'));
+  assert.ok(!partEvict.nextIds.includes('particull'));
+  assert.equal(analyzeSelection(partEvict.nextIds).warnings.length, 0);
+
+  // 4. safe-modernfix-config requires modernfix; datafly-lib is a pure library
+  const safeCfgAn = analyzeSelection(['safe-modernfix-config']);
+  assert.ok(safeCfgAn.warnings.some(w => w.modId === 'safe-modernfix-config' && w.fixModIds?.includes('modernfix')));
+  assert.equal(PURE_LIBRARY_MOD_IDS.has('datafly-lib'), true);
+
+  // 5. Cross-group soft overlaps appear in analogs, and pair overlaps / transitive dep clashes are never labeled compatible
+  const fixGpuAnalogs = getModAnalogsComparison(byId.get('fix-gpu-memory-leak')!, new Set(['embeddium', 'fix-gpu-memory-leak']));
+  assert.ok(fixGpuAnalogs.some(e => e.mod.id === 'gputape'));
+
+  const emberlensAnalogs = getModAnalogsComparison(byId.get('emberlens')!, new Set(['emberbium', 'emberlens']));
+  const fasterIris = emberlensAnalogs.find(e => e.mod.id === 'faster-iris-shadow-mapper');
+  assert.equal(fasterIris?.relation, 'conflict');
+  assert.equal(fasterIris?.canUseTogether, false);
+
+  const extrasAnalogs = getModAnalogsComparison(byId.get('embeddium-extras')!, new Set(['embeddium', 'embeddium-extras']));
+  const chloride = extrasAnalogs.find(e => e.mod.id === 'sodium-chloride');
+  assert.equal(chloride?.relationLabel, 'Частичное пересечение');
+  assert.equal(chloride?.canUseTogether, false);
+
+  const extrasWithEmberbiumContext = getModAnalogsComparison(byId.get('embeddium-extras')!, new Set(['emberbium', 'nvidium']));
+  const embeddiumUnderEmberContext = extrasWithEmberbiumContext.find(e => e.mod.id === 'embeddium');
+  assert.equal(embeddiumUnderEmberContext?.relation, 'leader');
+  assert.equal(embeddiumUnderEmberContext?.canUseTogether, true);
+  assert.ok((embeddiumUnderEmberContext?.points ?? 0) > 50, `Expected positive points for Embeddium, got ${embeddiumUnderEmberContext?.points}`);
+  const alloyiumUnderEmberContext = extrasWithEmberbiumContext.find(e => e.mod.id === 'alloyium');
+  assert.equal(alloyiumUnderEmberContext?.relation, 'addon-synergy');
+  assert.equal(alloyiumUnderEmberContext?.canUseTogether, true);
+
+  // 6. HC-HariChunk triggers memory-core warning both in analyzeSelection & Checker
+  const hariAn = analyzeSelection(['embeddium', 'hc-harichunk']);
+  assert.ok(hariAn.warnings.some(w => w.modId === 'hc-harichunk' && w.fixModIds?.includes('modernfix')));
+});
+
 

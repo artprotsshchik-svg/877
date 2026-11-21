@@ -206,8 +206,8 @@
       "Redirector [Modern]",
       "Jasione"
     ],
-    "explanation": "Данные моды заменяют одинаковые байткод-вызовы методов в Java. Старые версии вызывают краши.",
-    "recommendation": "Удалите старые Redirected и Redirector. Оставьте только Jasione (или ModernFix)."
+    "explanation": "Данные моды заменяют одинаковые вызовы Enum.values() в Java. Старые Redirected/Redirector вызывают краши и полностью заменяются Jasione (ModernFix этот механизм не дублирует).",
+    "recommendation": "Удалите старые Redirected и Redirector. Оставьте только Jasione в пару к ModernFix."
   },
   {
     "title": "Дубликаты оптимизаторов достижений",

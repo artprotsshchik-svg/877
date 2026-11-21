@@ -208,6 +208,7 @@ export const MOD_HARD_DEPENDENCIES: Record<string, string[]> = {
   'controlling': ['searchables'],
   'toast-control': ['placebo'],
   'iris-oculus-flywheel-compat': ['flywheel'],
+  'safe-modernfix-config': ['modernfix'],
 };
 
 export const MOD_ALTERNATIVE_DEPENDENCIES: Record<string, string[][]> = {
@@ -247,6 +248,7 @@ export const PURE_LIBRARY_MOD_IDS = new Set([
   'configured',
   'controlling',
   'searchables',
+  'datafly-lib',
 ]);
 
 export function findModByDisplayName(name: string): ModItem | undefined {
@@ -651,7 +653,7 @@ const SOFT_OVERLAP_EVICTION_MAP: ReadonlyArray<[ReadonlyArray<string>, ReadonlyA
   [['distant-horizons'], ['bobby-reforged', 'farsight']],
   [['servercore'], ['adaptive-performance-tweaks', 'adaptive-optimization-reborn']],
   [['mob-collision-off'], ['farmcollisionless', 'entity-collision-optimization']],
-  [['particle-core'], ['asyncparticles']],
+  [['particle-core'], ['asyncparticles', 'particull']],
   [['immersive-optimization'], ['entitysleep', 'enttick', 'sleepium', 'martensite-entity-tick-skiper']],
   [['gputape'], ['fix-gpu-memory-leak']],
   [['stutterfix-reforged'], [...EXCLUSIVE_ENGINE_POOLS['thread-schedulers']]],
@@ -4346,6 +4348,7 @@ function buildReplacementEvalSet(
   const directConflicts = new Set<string>([
     ...getRuleConflictingIds(candidate.id),
     ...findExclusivePoolPeers(candidate.id),
+    ...getSoftSlotOverlapEvictionIds(candidate.id, next),
   ]);
 
   let removedEmberbium = false;
@@ -4359,15 +4362,15 @@ function buildReplacementEvalSet(
   }
 
   const hardDeps = MOD_HARD_DEPENDENCIES[candidate.id] || [];
-  if (hardDeps.includes('embeddium') && removedEmberbium && !next.has('embeddium')) {
-    next.add('embeddium');
+  if ((hardDeps.includes('embeddium') || candidate.id === 'embeddium') && removedEmberbium) {
+    if (!next.has('embeddium') && candidate.id !== 'embeddium') next.add('embeddium');
     // Also clean any Emberbium-specific peer (e.g. Emberlens) if Embeddium is swapped in
     if (next.has('emberlens') && candidate.id !== 'emberlens') {
       next.delete('emberlens');
     }
   }
-  if (hardDeps.includes('emberbium') && removedEmbeddium && !next.has('emberbium')) {
-    next.add('emberbium');
+  if ((hardDeps.includes('emberbium') || candidate.id === 'emberbium') && removedEmbeddium) {
+    if (!next.has('emberbium') && candidate.id !== 'emberbium') next.add('emberbium');
     if (next.has('oculus') && candidate.id !== 'oculus') {
       next.delete('oculus');
     }
@@ -5382,6 +5385,12 @@ export function getModAnalogsComparison(
       peerIds.add(cid);
     }
   }
+  for (const sid of getSoftSlotOverlapEvictionIds(mod.id, new Set(MODS_DATABASE.map(m => m.id)))) {
+    const sm = MOD_BY_ID.get(sid);
+    if (sm && sm.status !== 'danger') {
+      peerIds.add(sid);
+    }
+  }
   for (const m of MODS_DATABASE) {
     if (m.supersededBy?.includes(mod.id) || matchesCoveredByName(m.coveredBy, mod.name) || matchesCoveredByName(mod.coveredBy, m.name)) {
       peerIds.add(m.id);
@@ -5402,6 +5411,22 @@ export function getModAnalogsComparison(
 
     const altRecipeCompat = prefs ? getRecipeBridgeStatus(alt, withoutSet, prefs).compatible : true;
     const isRuleConflict = conflictingWithMod.has(alt.id);
+    const pairContext = new Set([mod.id, alt.id]);
+    const pairModDeps = getTransitiveDependencies(mod.id, new Set(), pairContext);
+    const altDeps = getTransitiveDependencies(alt.id, new Set(), pairContext);
+    const depClashNames: string[] = [];
+    for (const depId of altDeps) {
+      if (depId === mod.id) continue;
+      if (conflictingWithMod.has(depId) || getRuleConflictingIds(depId).includes(mod.id) || pairModDeps.some(md => md !== depId && getRuleConflictingIds(depId).includes(md))) {
+        depClashNames.push(MOD_BY_ID.get(depId)?.name || depId);
+      }
+    }
+    for (const md of pairModDeps) {
+      if (md !== alt.id && getRuleConflictingIds(md).includes(alt.id)) {
+        depClashNames.push(MOD_BY_ID.get(md)?.name || md);
+      }
+    }
+    const isDepConflict = depClashNames.length > 0;
     const isCoveredInAlt = matchesCoveredByName(mod.coveredBy, alt.name);
     const isAltCoveredInMod = matchesCoveredByName(alt.coveredBy, mod.name);
     const altSupersedesMod = Boolean((mod.supersededBy?.includes(alt.id) || mod.supersededWhenAll?.includes(alt.id)) && altRecipeCompat && !isUnsupportedOnForge(alt));
@@ -5415,7 +5440,10 @@ export function getModAnalogsComparison(
     const pairwiseWarnings = pairAnalysis.warnings.filter(
       w => !soloModWarningKeys.has(`${w.modId}:${w.message}`) && !soloAltWarningKeys.has(`${w.modId}:${w.message}`)
     );
-    const hasPairWarning = pairwiseWarnings.length > 0;
+    const pairOverlapNote = evaluateModImpactInPack(mod, new Set([mod.id, alt.id]), pairAnalysis, prefs).interactions.find(
+      i => i.kind === 'overlap' && i.targetIds.includes(alt.id)
+    );
+    const hasPairOverlap = pairwiseWarnings.length > 0 || Boolean(pairOverlapNote);
     const pairClash = pairAnalysis.conflicts.length > 0;
 
     let relation: AnalogRelationKind;
@@ -5458,28 +5486,32 @@ export function getModAnalogsComparison(
       coUsageNote = isUnsupportedOnForge(alt)
         ? `Несовместимый Fabric-оригинал; на Forge используйте нативный порт.`
         : `Две реализации одного модуля (${dual?.title || 'одна ниша'}) — несовместимы, оставьте один вариант.`;
-    } else if (isRuleConflict || pairClash) {
+    } else if (isRuleConflict || pairClash || isDepConflict) {
       relation = 'conflict';
       relationLabel = 'Взаимоисключающие';
       canUseTogether = false;
-      coUsageNote = pairAnalysis.conflicts[0]?.rule.explanation || grp?.conflictReason || 'Нельзя ставить вместе в одну сборку (конфликт движков).';
+      coUsageNote =
+        pairAnalysis.conflicts[0]?.rule.explanation ||
+        (isDepConflict
+          ? `Зависимости (${Array.from(new Set(depClashNames)).join(' + ')}) несовместимы с ${mod.name}.`
+          : grp?.conflictReason || 'Нельзя ставить вместе в одну сборку (конфликт движков).');
     } else if (grp?.leaderId === alt.id) {
       relation = 'leader';
-      canUseTogether = !isUnsupportedOnForge(alt) && !hasPairWarning;
+      canUseTogether = !isUnsupportedOnForge(alt) && !hasPairOverlap;
       relationLabel = canUseTogether ? 'Лидер группы (можно вместе)' : 'Лидер слота (замена)';
       coUsageNote = canUseTogether
         ? `Базовый лидер ниши «${grp.title}» — хорошо работает совместно.`
-        : alt.bestAlternative || alt.description;
-    } else if (!hasPairWarning && !isUnsupportedOnForge(alt) && alt.status !== 'outdated' && alt.status !== 'redundant') {
+        : pairwiseWarnings[0]?.message || pairOverlapNote?.summary || alt.bestAlternative || alt.description;
+    } else if (!hasPairOverlap && !isUnsupportedOnForge(alt) && alt.status !== 'outdated' && alt.status !== 'redundant') {
       relation = 'addon-synergy';
       relationLabel = 'Можно совместно';
       canUseTogether = true;
       coUsageNote = alt.bestAlternative || alt.description;
     } else {
       relation = 'alternative';
-      canUseTogether = !isUnsupportedOnForge(alt) && !pairClash && !hasPairWarning;
-      relationLabel = hasPairWarning ? 'Частичное пересечение' : isUnsupportedOnForge(alt) ? 'Не для Forge' : 'Альтернатива';
-      coUsageNote = pairwiseWarnings[0]?.message || alt.bestAlternative || alt.warning || alt.description;
+      canUseTogether = !isUnsupportedOnForge(alt) && !pairClash && !isDepConflict && !hasPairOverlap;
+      relationLabel = hasPairOverlap ? 'Частичное пересечение' : isUnsupportedOnForge(alt) ? 'Не для Forge' : 'Альтернатива';
+      coUsageNote = pairwiseWarnings[0]?.message || pairOverlapNote?.summary || alt.bestAlternative || alt.warning || alt.description;
     }
 
     // Evaluate compatible joint peers WITH current mod present (or clearing mutually-exclusive slot peer if mod depends on alt),
@@ -5487,9 +5519,10 @@ export function getModAnalogsComparison(
     let evalSet: Set<string>;
     let evalAnalysis: ReturnType<typeof analyzeSelection> | undefined;
     if (canUseTogether) {
-      const modNeedsAlt = getDirectDependencies(mod.id, withoutSet).includes(alt.id);
-      evalSet = modNeedsAlt ? buildReplacementEvalSet(alt, withModSet, prefs) : withModSet;
-      evalAnalysis = evalSet === withModSet ? withModAnalysis : undefined;
+      evalSet = buildReplacementEvalSet(alt, withModSet, prefs);
+      const isSameAsWithMod =
+        evalSet.size === withModSet.size && Array.from(evalSet).every(id => withModSet.has(id));
+      evalAnalysis = isSameAsWithMod ? withModAnalysis : undefined;
     } else {
       evalSet = buildReplacementEvalSet(alt, withoutSet, prefs);
       evalAnalysis = undefined;
@@ -5516,8 +5549,9 @@ export function getModAnalogsComparison(
   const getRank = (e: AnalogComparisonEntry): number => {
     if (e.relation === 'better-replacement') return 0;
     if (e.relation === 'leader') return 1;
-    if (e.relation === 'builtin-covered') return 2;
+    if (e.relation === 'builtin-covered' || e.relation === 'overlap-duplicate') return 2;
     if (e.relation === 'dual-port') return 3;
+    if (e.relationLabel === 'Частичное пересечение') return 4;
     if (
       e.relation === 'addon-synergy' &&
       (addonSet.has(e.mod.id) || CORE_PILLAR_IDS.has(e.mod.id) || HIGH_SYNERGY_IDS.has(e.mod.id) || e.points >= 40)

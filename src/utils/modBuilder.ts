@@ -1315,7 +1315,14 @@ export function toggleModSmart(
   for (const existingId of Array.from(next)) {
     const existingMod = MOD_BY_ID.get(existingId);
     if (!existingMod) continue;
-    if (existingMod.supersededBy?.includes(modId)) {
+    const supersededByAdded =
+      existingMod.supersededBy?.includes(modId) ||
+      Boolean(
+        existingMod.supersededWhenAll &&
+          existingMod.supersededWhenAll.includes(modId) &&
+          existingMod.supersededWhenAll.every(sid => sid === modId || next.has(sid))
+      );
+    if (supersededByAdded) {
       next.delete(existingId);
       evictedIds.add(existingId);
       removedNames.push(existingMod.name);

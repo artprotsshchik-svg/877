@@ -109,4 +109,22 @@ test('getCompatibleAddonsForMod excludes incompatible/unsupported group addons f
   assert.ok(!emberbiumCompat.includes('alloyium'));
   assert.ok(!emberbiumCompat.includes('maple-mesh-render'));
   assert.ok(emberbiumCompat.includes('flerovium'));
+
+  const entityGroup = getGroupMembersByRole('block-culling')!;
+  const entityCompat = getCompatibleAddonsForMod(BY_ID.get('entity-culling')!, entityGroup.addons).map(a => a.id);
+  assert.ok(!entityCompat.includes('jem-adaptive-culling'));
+  assert.ok(!entityCompat.includes('sodium-sightline'));
+
+  const particleGroup = getGroupMembersByRole('particles-audio')!;
+  const particleCompat = getCompatibleAddonsForMod(BY_ID.get('particle-core')!, particleGroup.addons).map(a => a.id);
+  assert.ok(!particleCompat.includes('particull'));
+  assert.ok(!particleCompat.includes('asyncparticles'));
+
+  const dynamicGroup = getGroupMembersByRole('upscaling-bg')!;
+  const dynamicCompat = getCompatibleAddonsForMod(BY_ID.get('dynamic-fps')!, dynamicGroup.addons).map(a => a.id);
+  assert.ok(!dynamicCompat.includes('restmode'));
+
+  const animGroup = getGroupMembersByRole('animations-compat')!;
+  const geckoCompat = getCompatibleAddonsForMod(BY_ID.get('geckolib-animation-optimizer')!, animGroup.addons).map(a => a.id);
+  assert.ok(!geckoCompat.includes('geckolibbetterfps'));
 });

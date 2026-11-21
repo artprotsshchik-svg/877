@@ -1524,7 +1524,7 @@
     "isGroupLeader": false,
     "isGroupAddon": false,
     "addons": [],
-    "coveredBy": "AllTheLeaks + ModernFix",
+    "coveredBy": "AllTheLeaks (Memory Leak Fix) + ModernFix",
     "supersededBy": [
       "alltheleaks-memory-leak-fix"
     ]

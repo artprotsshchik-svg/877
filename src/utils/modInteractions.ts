@@ -7,8 +7,10 @@ import {
   analyzeSelection,
   getDirectDependencies,
   getRuleConflictingIds,
+  getSoftSlotOverlapEvictionIds,
   getTransitiveDependencies,
   isUnsupportedOnForge,
+  matchesCoveredByName,
   summarizeAssemblyImpact,
 } from './modAnalyzer.ts';
 import { toggleModSmart } from './modBuilder.ts';
@@ -209,6 +211,9 @@ export function getCompatibleAddonsForMod(mod: ModItem, addons: ModItem[]): ModI
     }
   }
   const modContext = new Set<string>([mod.id, ...getTransitiveDependencies(mod.id)]);
+  const softOverlapPeers = new Set(
+    getSoftSlotOverlapEvictionIds(mod.id, new Set(addons.map(a => a.id)))
+  );
 
   return addons.filter(addon => {
     if (addon.id === mod.id) return false;
@@ -216,6 +221,16 @@ export function getCompatibleAddonsForMod(mod: ModItem, addons: ModItem[]): ModI
     if (modConflicts.has(addon.id) || getRuleConflictingIds(addon.id).includes(mod.id)) return false;
     if (modDepConflicts.has(addon.id)) return false;
     if (modPoolSet && modPoolSet.has(addon.id)) return false;
+    if (softOverlapPeers.has(addon.id)) return false;
+    if (
+      addon.supersededBy?.includes(mod.id) ||
+      (addon.supersededWhenAll?.includes(mod.id) &&
+        addon.supersededWhenAll.every(sid => modContext.has(sid))) ||
+      matchesCoveredByName(addon.coveredBy, mod.name) ||
+      matchesCoveredByName(mod.coveredBy, addon.name)
+    ) {
+      return false;
+    }
 
     const addonDeps = getTransitiveDependencies(addon.id, new Set(), modContext);
     if (addonDeps.some(dep => modConflicts.has(dep) || modDepConflicts.has(dep))) {

@@ -2541,7 +2541,10 @@
     "isGroupLeader": false,
     "isGroupAddon": false,
     "addons": [],
-    "coveredBy": ""
+    "coveredBy": "",
+    "supersededBy": [
+      "krypton-reno"
+    ]
   },
   {
     "id": "c2s-log-filter",

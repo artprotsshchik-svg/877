@@ -3069,7 +3069,10 @@
     "isGroupLeader": false,
     "isGroupAddon": false,
     "addons": [],
-    "coveredBy": "Oculus (порт для Forge)"
+    "coveredBy": "Oculus (порт для Forge)",
+    "supersededBy": [
+      "oculus"
+    ]
   },
   {
     "id": "indium",

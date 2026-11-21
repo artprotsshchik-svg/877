@@ -336,7 +336,32 @@ export function CheckerTab({ checkedModIds, setCheckedModIds, prefs, onOpenDetai
 
   const redWarnings = analysis.warnings.filter(w => w.severity === 'red');
   const yellowWarnings = analysis.warnings.filter(w => w.severity === 'yellow');
-  const hasAnyIssues = analysis.conflicts.length > 0 || analysis.warnings.length > 0;
+  const heavyRamMemoryAdvisory = useMemo(() => {
+    if (checkedModIds.length < 2) return null;
+    const heavyModId = [
+      'distant-horizons',
+      'concurrent-chunk-management-engine-forge-c2me',
+      'c2me-concurrent-chunk-management-engine',
+      'c2mer',
+      'hc-harichunk',
+      'bobby-reforged',
+      'farsight',
+    ].find(id => checkedSet.has(id));
+    if (!heavyModId) return null;
+    const missingMemIds = ['modernfix', 'ferritecore'].filter(id => !checkedSet.has(id));
+    if (missingMemIds.length === 0) return null;
+    const heavyName = MOD_BY_ID.get(heavyModId)?.name || heavyModId;
+    const missingNames = missingMemIds.map(id => MOD_BY_ID.get(id)?.name || id);
+    return {
+      message: `${heavyName} активно расходует ОЗУ под LOD/чанки — добавьте базовый стек памяти (${missingNames.join(' + ')}) для защиты от GC-фризов и OOM.`,
+      fixModIds: missingMemIds,
+      missingNames,
+    };
+  }, [checkedModIds.length, checkedSet]);
+  const hasAnyIssues =
+    analysis.conflicts.length > 0 ||
+    analysis.warnings.length > 0 ||
+    Boolean(heavyRamMemoryAdvisory);
 
   return (
     <div className="space-y-4">
@@ -668,7 +693,7 @@ export function CheckerTab({ checkedModIds, setCheckedModIds, prefs, onOpenDetai
               )}
               {analysis.conflicts.length > 0 || redWarnings.length > 0
                 ? `Обнаружены конфликты и ошибки (${analysis.conflicts.length + redWarnings.length})`
-                : `Замечания и условные моды (${yellowWarnings.length})`}
+                : `Замечания и условные моды (${yellowWarnings.length + (heavyRamMemoryAdvisory ? 1 : 0)})`}
             </div>
           </div>
           <div className="space-y-2">
@@ -743,6 +768,20 @@ export function CheckerTab({ checkedModIds, setCheckedModIds, prefs, onOpenDetai
                 </div>
               );
             })}
+            {heavyRamMemoryAdvisory && (
+              <div className="bg-[#e5a93c]/[0.05] border border-[#e5a93c]/30 rounded-[4px] p-3 text-xs flex items-center justify-between gap-3">
+                <span className="text-[#e5a93c]">{heavyRamMemoryAdvisory.message}</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCheckedModIds(prev => applyWarningFix(prev, heavyRamMemoryAdvisory.fixModIds, effectivePrefs).nextIds)
+                  }
+                  className="shrink-0 px-2.5 py-1 rounded-[4px] bg-[#121417] hover:bg-[#22262b] border border-[#2a2e33] text-[#e6e8ea] font-medium"
+                >
+                  Добавить {heavyRamMemoryAdvisory.missingNames.join(' + ')}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
