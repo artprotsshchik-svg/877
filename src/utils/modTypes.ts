@@ -191,6 +191,8 @@ export interface DubiousModEntry {
 export interface AssemblyScoreBreakdown {
   efficiencyScore: number;
   stabilityScore: number;
+  cleanlinessScore: number;
+  visualSafetyScore: number;
   coverageScore: number;
   synergyBonus: number;
   penaltyPoints: number;

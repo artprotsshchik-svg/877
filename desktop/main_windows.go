@@ -10,12 +10,47 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
+	"unsafe"
 
 	webview2 "github.com/jchv/go-webview2"
 )
+
+var (
+	user32DLL         = syscall.NewLazyDLL("user32.dll")
+	procMessageBoxW   = user32DLL.NewProc("MessageBoxW")
+	procFindWindowW   = user32DLL.NewProc("FindWindowW")
+	procDestroyWindow = user32DLL.NewProc("DestroyWindow")
+)
+
+const (
+	mbOK              = 0x00000000
+	mbIconError       = 0x00000010
+	mbIconInformation = 0x00000040
+)
+
+func showNativeMessageBox(title, text string, flags uint32) {
+	tPtr, _ := syscall.UTF16PtrFromString(title)
+	mPtr, _ := syscall.UTF16PtrFromString(text)
+	_, _, _ = procMessageBoxW.Call(
+		0,
+		uintptr(unsafe.Pointer(mPtr)),
+		uintptr(unsafe.Pointer(tPtr)),
+		uintptr(flags),
+	)
+}
+
+func destroyOrphanWebviewWindow(title string) {
+	classPtr, _ := syscall.UTF16PtrFromString("webview")
+	titlePtr, _ := syscall.UTF16PtrFromString(title)
+	hwnd, _, _ := procFindWindowW.Call(uintptr(unsafe.Pointer(classPtr)), uintptr(unsafe.Pointer(titlePtr)))
+	if hwnd != 0 {
+		_, _, _ = procDestroyWindow.Call(hwnd)
+	}
+}
 
 func resolveAppDataDir() string {
 	base, err := os.UserConfigDir()
@@ -76,32 +111,79 @@ func openExternalWindows(rawURL string) error {
 	return cmd.Start()
 }
 
-func launchBrowserAppFallback(appURL string) error {
+func launchBrowserAppFallback(appURL, appDir string) {
+	localAppData := os.Getenv("LOCALAPPDATA")
+	programFiles := os.Getenv("ProgramFiles")
+	programFilesX86 := os.Getenv("ProgramFiles(x86)")
+
 	candidates := []string{
-		filepath.Join(os.Getenv("ProgramFiles(x86)"), "Microsoft", "Edge", "Application", "msedge.exe"),
-		filepath.Join(os.Getenv("ProgramFiles"), "Microsoft", "Edge", "Application", "msedge.exe"),
-		filepath.Join(os.Getenv("ProgramFiles"), "Google", "Chrome", "Application", "chrome.exe"),
-		filepath.Join(os.Getenv("ProgramFiles(x86)"), "Google", "Chrome", "Application", "chrome.exe"),
+		filepath.Join(programFilesX86, "Microsoft", "Edge", "Application", "msedge.exe"),
+		filepath.Join(programFiles, "Microsoft", "Edge", "Application", "msedge.exe"),
+		filepath.Join(localAppData, "Microsoft", "Edge", "Application", "msedge.exe"),
+		filepath.Join(programFiles, "Google", "Chrome", "Application", "chrome.exe"),
+		filepath.Join(programFilesX86, "Google", "Chrome", "Application", "chrome.exe"),
+		filepath.Join(localAppData, "Google", "Chrome", "Application", "chrome.exe"),
 	}
+
+	profileDir := filepath.Join(appDir, "browser-app")
+	_ = os.MkdirAll(profileDir, 0o755)
+
 	for _, bin := range candidates {
-		if bin == "" {
+		if strings.TrimSpace(bin) == "" || !strings.HasSuffix(strings.ToLower(bin), ".exe") {
 			continue
 		}
-		if _, err := os.Stat(bin); err == nil {
-			cmd := exec.Command(bin, "--app="+appURL, "--window-size=1360,880")
-			if err := cmd.Start(); err == nil {
-				_ = cmd.Wait()
-				return nil
+		if _, err := os.Stat(bin); err != nil {
+			continue
+		}
+		startedAt := time.Now()
+		cmd := exec.Command(
+			bin,
+			"--user-data-dir="+profileDir,
+			"--no-first-run",
+			"--no-default-browser-check",
+			"--new-window",
+			"--app="+appURL,
+			"--window-size=1360,880",
+		)
+		if err := cmd.Start(); err == nil {
+			_ = cmd.Wait()
+			// If the browser held the process until window close, exit cleanly.
+			if time.Since(startedAt) >= 2*time.Second {
+				return
 			}
+			// If Edge/Chrome delegated to an already running instance and exited immediately,
+			// keep local HTTP server alive until user closes the session dialog.
+			showNativeMessageBox(
+				"Mod Optimizer — Forge 1.20.1",
+				fmt.Sprintf("Приложение открыто в окне браузера (%s).\nНе закрывайте это диалоговое окно во время работы — нажмите ОК для завершения.", appURL),
+				mbOK|mbIconInformation,
+			)
+			return
 		}
 	}
-	return openExternalWindows(appURL)
+
+	if err := openExternalWindows(appURL); err != nil {
+		showNativeMessageBox(
+			"Ошибка запуска Mod Optimizer",
+			fmt.Sprintf("Не удалось открыть WebView2 или браузер по адресу %s:\n%v", appURL, err),
+			mbOK|mbIconError,
+		)
+		return
+	}
+	showNativeMessageBox(
+		"Mod Optimizer — Forge 1.20.1",
+		fmt.Sprintf("Приложение запущено в браузере (%s).\nНажмите ОК, когда закончите работу с программой.", appURL),
+		mbOK|mbIconInformation,
+	)
 }
 
 func main() {
+	runtime.LockOSThread()
+
 	distFS, err := fs.Sub(webDistFS, "webdist")
 	if err != nil {
-		panic(err)
+		showNativeMessageBox("Ошибка ресурсов Mod Optimizer", err.Error(), mbOK|mbIconError)
+		os.Exit(1)
 	}
 
 	appDir := resolveAppDataDir()
@@ -113,7 +195,8 @@ func main() {
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		panic(err)
+		showNativeMessageBox("Ошибка локального сервера Mod Optimizer", err.Error(), mbOK|mbIconError)
+		os.Exit(1)
 	}
 	srv := &http.Server{
 		Handler:           handler,
@@ -125,13 +208,16 @@ func main() {
 	defer srv.Close()
 
 	appURL := "http://" + listener.Addr().String() + "/"
+	webviewDataDir := filepath.Join(appDir, "webview2")
+	_ = os.MkdirAll(webviewDataDir, 0o755)
 
+	const windowTitle = "Mod Optimizer — Forge 1.20.1"
 	w := webview2.NewWithOptions(webview2.WebViewOptions{
 		Debug:     false,
 		AutoFocus: true,
-		DataPath:  filepath.Join(appDir, "webview2"),
+		DataPath:  webviewDataDir,
 		WindowOptions: webview2.WindowOptions{
-			Title:  "Mod Optimizer — Forge 1.20.1",
+			Title:  windowTitle,
 			Width:  1360,
 			Height: 880,
 			IconId: 1,
@@ -139,7 +225,8 @@ func main() {
 		},
 	})
 	if w == nil {
-		_ = launchBrowserAppFallback(appURL)
+		destroyOrphanWebviewWindow(windowTitle)
+		launchBrowserAppFallback(appURL, appDir)
 		return
 	}
 	defer w.Destroy()

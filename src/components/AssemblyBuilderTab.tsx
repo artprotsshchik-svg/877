@@ -31,19 +31,14 @@ import {
   toggleModSmart,
   type AssemblyPreferences,
   type GameMode,
-  type GpuProfile,
-  type OptimizationGoal,
-  type PackScale,
   type RecipeViewerChoice,
 } from '../utils/modLogic.ts';
-import { estimateFpsRange } from '../utils/fpsEstimator.ts';
 import {
   addMissingDependenciesForMod,
   getConflictsForMod,
   getMissingDependenciesForMod,
   replaceConflictingWithMod,
 } from '../utils/modInteractions.ts';
-import { exportAssemblyAsJson, triggerFileDownload } from '../utils/exportFormats.ts';
 import { AssemblyDetailModal, type AnalyzedAssemblyModRow } from './AssemblyDetailModal.tsx';
 import { DubiousModsModal } from './DubiousModsModal.tsx';
 import { StatusBadge } from './StatusBadge.tsx';
@@ -56,7 +51,6 @@ import {
   ChevronDown,
   ChevronUp,
   Copy,
-  Download,
   ExternalLink,
   Info,
   Plus,
@@ -161,10 +155,6 @@ export function AssemblyBuilderTab({
   const assemblyImpact = useMemo(
     () => summarizeAssemblyImpact(selectedIds, analysis, prefs),
     [selectedIds, analysis, prefs]
-  );
-  const fpsEstimate = useMemo(
-    () => estimateFpsRange(selectedIds, assemblyImpact, prefs),
-    [selectedIds, assemblyImpact, prefs]
   );
 
   const analyzedDetailRows = useMemo<AnalyzedAssemblyModRow[]>(() => {
@@ -422,15 +412,6 @@ export function AssemblyBuilderTab({
     setExpandedRowIds({});
     setIssuesPanelOpen(false);
     setSmartNotice(null);
-  };
-
-  const handleDownloadJson = () => {
-    if (selectedIds.length === 0) return;
-    triggerFileDownload(
-      'forge-1.20.1-assembly.json',
-      exportAssemblyAsJson(selectedIds, assemblyImpact, fpsEstimate, prefs),
-      'application/json;charset=utf-8'
-    );
   };
 
   const handleCopyConfig = (modId: string, content: string) => {
@@ -868,20 +849,6 @@ export function AssemblyBuilderTab({
           className="pt-2 border-t border-[#2a2e33] flex flex-wrap items-center gap-2 text-xs"
         >
           <label className="inline-flex items-center gap-1.5 text-[11px] text-[#8b9199]">
-            <span>GPU</span>
-            <select
-              aria-label="Профиль GPU"
-              value={prefs.gpu}
-              onChange={e => setPrefs(p => ({ ...p, gpu: e.target.value as GpuProfile }))}
-              className="bg-[#121417] border border-[#2a2e33] rounded-[4px] px-2 py-1 text-xs text-[#e6e8ea] focus:border-[#3ddc84]"
-            >
-              <option value="nvidia">NVIDIA (RTX/GTX)</option>
-              <option value="amd-intel">AMD / Intel</option>
-              <option value="integrated">Встройка</option>
-            </select>
-          </label>
-
-          <label className="inline-flex items-center gap-1.5 text-[11px] text-[#8b9199]">
             <span>Режим</span>
             <select
               aria-label="Режим игры"
@@ -892,34 +859,6 @@ export function AssemblyBuilderTab({
               <option value="singleplayer">Соло</option>
               <option value="server">Сервер / Сетевая</option>
               <option value="hybrid-server">Гибрид (Mohist/Arclight)</option>
-            </select>
-          </label>
-
-          <label className="inline-flex items-center gap-1.5 text-[11px] text-[#8b9199]">
-            <span>Цель</span>
-            <select
-              aria-label="Цель сборки"
-              value={prefs.goal}
-              onChange={e => setPrefs(p => ({ ...p, goal: e.target.value as OptimizationGoal }))}
-              className="bg-[#121417] border border-[#2a2e33] rounded-[4px] px-2 py-1 text-xs text-[#e6e8ea] focus:border-[#3ddc84]"
-            >
-              <option value="balanced">Баланс</option>
-              <option value="max-safe">Макс. FPS</option>
-              <option value="potato">Слабый ПК</option>
-            </select>
-          </label>
-
-          <label className="inline-flex items-center gap-1.5 text-[11px] text-[#8b9199]">
-            <span>Пак</span>
-            <select
-              aria-label="Масштаб модпака"
-              value={prefs.packScale ?? 'medium'}
-              onChange={e => setPrefs(p => ({ ...p, packScale: e.target.value as PackScale }))}
-              className="bg-[#121417] border border-[#2a2e33] rounded-[4px] px-2 py-1 text-xs text-[#e6e8ea] focus:border-[#3ddc84]"
-            >
-              <option value="light">Лёгкий (&lt;80)</option>
-              <option value="medium">Средний</option>
-              <option value="heavy">200+ модов</option>
             </select>
           </label>
 
@@ -934,19 +873,6 @@ export function AssemblyBuilderTab({
             }`}
           >
             Шейдеры
-          </button>
-
-          <button
-            type="button"
-            aria-pressed={prefs.useCreate}
-            onClick={() => setPrefs(p => ({ ...p, useCreate: !p.useCreate }))}
-            className={`px-2.5 py-1 rounded-[4px] border text-xs font-medium transition-colors duration-150 whitespace-nowrap ${
-              prefs.useCreate
-                ? 'bg-[#22262b] border-[#3ddc84] text-[#3ddc84] font-semibold'
-                : 'bg-[#121417] border-[#2a2e33] text-[#8b9199] hover:text-[#e6e8ea]'
-            }`}
-          >
-            Create
           </button>
 
           {focusMod && (
@@ -1017,21 +943,13 @@ export function AssemblyBuilderTab({
           className="bg-[#1a1d21] border border-[#2a2e33] rounded-[6px] px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs"
         >
           <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[#8b9199] tabular-nums">
-            <span>
+            <span title="Средняя мультифакторная оценка: эффективность, стабильность, чистота связки, визуал">
               Оценка:{' '}
               <strong className="font-mono text-[#3ddc84]">{assemblyImpact.assemblyScore}/100</strong>
             </span>
             <span className="text-[#2a2e33]" aria-hidden="true">·</span>
-            <span title={fpsEstimate.note}>
-              Прогноз:{' '}
-              <strong className={`font-mono ${fpsEstimate.hasConflicts ? 'text-[#e55353]' : 'text-[#3ddc84]'}`}>
-                {fpsEstimate.label}
-              </strong>
-            </span>
-            <span className="text-[#2a2e33]" aria-hidden="true">·</span>
-            <span>
-              ОЗУ:{' '}
-              <strong className="font-mono text-[#e6e8ea]">{assemblyImpact.resourceBalance.ramDeltaLabel}</strong>
+            <span className="text-[11px] font-mono text-[#9aa1aa]">
+              Эф {assemblyImpact.scoreBreakdown.efficiencyScore} · Ст {assemblyImpact.scoreBreakdown.stabilityScore} · Чист {assemblyImpact.scoreBreakdown.cleanlinessScore} · Виз {assemblyImpact.scoreBreakdown.visualSafetyScore}
             </span>
             <span className="text-[#2a2e33]" aria-hidden="true">·</span>
             <span>
@@ -1040,11 +958,6 @@ export function AssemblyBuilderTab({
                 {assemblyImpact.artifactRisk.chancePct}% · {assemblyImpact.artifactRisk.label}
               </strong>
             </span>
-            <span className="text-[#2a2e33]" aria-hidden="true">·</span>
-            <span>
-              Подсистемы:{' '}
-              <strong className="font-mono text-[#e6e8ea]">{assemblyImpact.coveredSubsystems.length}/7</strong>
-            </span>
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
@@ -1052,16 +965,16 @@ export function AssemblyBuilderTab({
               <button
                 type="button"
                 onClick={() => setShowDubiousModal(true)}
-                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[4px] border text-[11px] font-semibold transition-colors duration-150 whitespace-nowrap tabular-nums ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-[4px] border text-[11px] font-semibold transition-colors duration-150 whitespace-nowrap tabular-nums ${
                   hasRiskyDubious
-                    ? 'bg-[#e5a93c]/[0.08] border-[#e5a93c]/40 text-[#e5a93c] hover:bg-[#e5a93c]/15'
-                    : 'bg-[#121417] border-[#2a2e33] text-[#8b9199] hover:text-[#e6e8ea] hover:bg-[#22262b]'
+                    ? 'bg-[#e5a93c]/20 border-[#e5a93c]/70 text-[#f2bc52] hover:bg-[#e5a93c]/30'
+                    : 'bg-[#5cb3ff]/15 border-[#5cb3ff]/65 text-[#6ec1ff] hover:bg-[#5cb3ff]/25'
                 }`}
               >
                 {hasRiskyDubious ? (
-                  <AlertTriangle className="w-3 h-3" aria-hidden="true" />
+                  <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
                 ) : (
-                  <Info className="w-3 h-3" aria-hidden="true" />
+                  <Info className="w-3.5 h-3.5" aria-hidden="true" />
                 )}
                 {hasRiskyDubious ? `Сомнительные (${dubiousCount})` : `Нюансы (${dubiousCount})`}
               </button>
@@ -1316,15 +1229,9 @@ export function AssemblyBuilderTab({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={handleDownloadJson}
-            disabled={selectedIds.length === 0}
-            className="py-1.5 px-3 rounded-[4px] bg-[#3ddc84] hover:bg-[#34c776] text-[#0f1411] text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-150 whitespace-nowrap shrink-0"
-          >
-            <Download className="w-3.5 h-3.5" aria-hidden="true" />
-            <span>Скачать JSON</span>
-          </button>
+          <span className="font-mono text-[11px] text-[#8b9199] tabular-nums whitespace-nowrap shrink-0">
+            Оценка {assemblyImpact.assemblyScore}/100
+          </span>
         </div>
       </div>
 

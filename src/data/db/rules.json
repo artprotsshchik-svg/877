@@ -377,16 +377,14 @@
     "recommendation": "Не используйте несколько ClearLag-чистильщиков вместе; в большинстве сборок достаточно Clumps + Let Me Despawn."
   },
   {
-    "title": "Дублирование модов деспавна мобов с лутом (Let Me Despawn ↔ DespawnTweaker / Despawn Tweaks)",
+    "title": "Дублирование модов деспавна мобов с лутом (Let Me Despawn ↔ DespawnTweaker)",
     "category": "Предметы, контейнеры и рецепты",
     "conflictingMods": [
       "Let Me Despawn",
-      "DespawnTweaker",
-      "Despawn Tweaks",
-      "Despawn Tweaks modern port"
+      "DespawnTweaker"
     ],
-    "explanation": "Все эти моды изменяют одни и те же правила сохранения и деспавна мобов с подобранным дропом/экипировкой. Совместная установка дублирует миксины и проверки спавна.",
-    "recommendation": "Выберите строго один вариант (на Forge 1.20.1 рекомендуется Let Me Despawn + Almanac Lib)."
+    "explanation": "DespawnTweaker является расширенной веткой механики Let Me Despawn и перехватывает те же проверки сохранения/деспавна мобов с подобранным дропом.",
+    "recommendation": "Выберите строго один вариант (рекомендуется Let Me Despawn)."
   },
   {
     "title": "Дублирование отключения дождя (No Rain ↔ Disable Rain)",
@@ -444,132 +442,5 @@
     ],
     "explanation": "Xenon является форком Embeddium со встроенными опциями и изменённым API: он конфликтует с Embeddium Extras (Sodium Extras), Sodium/Embeddium Leaf Culling и рядом аддонов под Embeddium 0.3.31 (Chloride, Alloyium, Flerovium, Revidium/Acedium, Options API, Cullify).",
     "recommendation": "Для работы всех современных аддонов Embeddium перейдите на классический Embeddium (или Emberbium), либо удалите несовместимые аддоны при использовании Xenon."
-  },
-  {
-    "title": "Конфликт оптимизаторов RecipeManager (FastSuite ↔ Fast Recipe Search)",
-    "category": "Предметы, контейнеры и рецепты",
-    "conflictingMods": [
-      "FastSuite",
-      "Fast Recipe Search"
-    ],
-    "explanation": "Оба мода переписывают и кэшируют ванильный RecipeManager разными способами (асинхронный кэш крафта против хэш-индекса поиска). Совместная установка прямо указана авторами как несовместимая и вызывает ошибки или сбои крафта.",
-    "recommendation": "При использовании JEI или EMI оставьте Fast Recipe Search; если просмотрщик рецептов отключён, используйте FastSuite (+ Placebo)."
-  },
-  {
-    "title": "Дублирование портов StutterFix (StutterFix-Reforged ↔ StutterFix modern port)",
-    "category": "Потоки CPU и планировщик",
-    "conflictingMods": [
-      "StutterFix-Reforged",
-      "StutterFix modern port"
-    ],
-    "explanation": "Оба мода переносят одинаковые хуки синхронизации планировщика кадров и серверного/рендер-потока StutterFix. Совместная установка вызывает двойной перехват планировщика.",
-    "recommendation": "Оставьте только один актуальный порт: StutterFix-Reforged."
-  },
-  {
-    "title": "Дублирование портов Language Reload (Language Reload Reforged ↔ LanguageReloadUnofficial)",
-    "category": "Загрузка игры и ресурспаков",
-    "conflictingMods": [
-      "Language Reload Reforged",
-      "LanguageReloadUnofficial"
-    ],
-    "explanation": "Оба мода являются портами одного и того же мода Language Reload для быстрой смены языка без полной перезагрузки ресурсов и перехватывают одни и те же методы LanguageManager.",
-    "recommendation": "Оставьте только один порт (Language Reload Reforged)."
-  },
-  {
-    "title": "Дублирование портов Capability Fix (Capability Fix ↔ Capability Fix Revived)",
-    "category": "Тики, TPS, сущности и ИИ",
-    "conflictingMods": [
-      "Capability Fix",
-      "Capability Fix Revived"
-    ],
-    "explanation": "Capability Fix Revived — обновлённое продолжение оригинального Capability Fix с тем же исправлением утечек и лишних аллокаций Forge Capabilities.",
-    "recommendation": "Удалите устаревший Capability Fix и оставьте только Capability Fix Revived."
-  },
-  {
-    "title": "Дублирование клиентского кэша чанков (Bobby Reforged ↔ Farsight)",
-    "category": "Прослойка Fabric и LOD",
-    "conflictingMods": [
-      "Bobby Reforged",
-      "Farsight"
-    ],
-    "explanation": "Оба мода перехватывают пакеты выгрузки чанков клиента на сервере и кэшируют их поверх серверного view-distance. Вместе конкурируют за буферы чанков и тратят двойную RAM/VRAM.",
-    "recommendation": "Используйте Distant Horizons (рекомендуется на 2026) либо максимум один из старых кэшеров (Bobby Reforged)."
-  },
-  {
-    "title": "Дублирование оптимизаторов печей (FastFurnace ↔ FurnaceOptimizer)",
-    "category": "Предметы, контейнеры и рецепты",
-    "conflictingMods": [
-      "FastFurnace",
-      "FurnaceOptimizer"
-    ],
-    "explanation": "Оба мода кэшируют проверку рецептов переплавки в AbstractFurnaceBlockEntity. При совместной установке миксины переплавки перекрываются.",
-    "recommendation": "Оставьте проверенный FastFurnace (+ Placebo)."
-  },
-  {
-    "title": "Конфликт многопоточных движков (C2ME ↔ Dimensional Threading Reforked)",
-    "category": "Чанки и генерация мира",
-    "conflictingMods": [
-      "Dimensional Threading Reforked (серверное)",
-      "C2ME (Concurrent Chunk Management Engine)",
-      "Concurrent Chunk Management Engine - Forge (C2MEF)",
-      "C2MER"
-    ],
-    "explanation": "C2ME распараллеливает генерацию и I/O чанков в глобальных пулах потоков, а Dimensional Threading выносит тики каждого измерения (Overworld/Nether/End) в отдельные воркеры. Совместный перехват карт чанков и сущностей вызывает гонки потоков (ConcurrentModificationException) и повреждение мира.",
-    "recommendation": "Для серверов используйте проверенный C2MEF (или Fabric C2ME через Sinytra) без Dimensional Threading Reforked."
-  },
-  {
-    "title": "Конфликт Zstd-сжатия пакетов (ZSTDNET ↔ Krypton Hybrid / AegisNetworking)",
-    "category": "Сеть",
-    "conflictingMods": [
-      "ZSTDNET",
-      "Krypton Hybrid",
-      "AegisNetworking (не ставить вместе с Krypton Hybrid)"
-    ],
-    "explanation": "Krypton Hybrid и AegisNetworking уже встраивают нативное Zstd/LZ4-сжатие сетевых пакетов, а ZSTDNET полностью заменяет ванильный кодек сжатия на Zstandard. Совместная установка ломает сетевой пайплайн Netty и вызывает обрыв соединения при входе.",
-    "recommendation": "Для гибридных серверов оставьте один Krypton Hybrid (либо чистый Krypton Reno для стандартного Forge); при использовании ZSTDNET убедитесь, что он установлен и на сервере, и у всех клиентов."
-  },
-  {
-    "title": "Дублирование перехватчиков взрывов (Better TNT ↔ Perfomant Boom)",
-    "category": "Тики, TPS, сущности и ИИ",
-    "conflictingMods": [
-      "Better TNT",
-      "Perfomant Boom"
-    ],
-    "explanation": "Оба мода переписывают алгоритм расчёта лучей разрушения блоков и очередей взрывов. Совместная установка приводит к наложению миксинов и непредсказуемому урону по блокам.",
-    "recommendation": "Оставьте только один оптимизатор взрывов (например, Better TNT)."
-  },
-  {
-    "title": "Дублирование переработки экрана F3 (Compact F3 Plus ↔ Improved F3)",
-    "category": "Профилировщики и мониторинг",
-    "conflictingMods": [
-      "Compact F3 Plus",
-      "Improved F3"
-    ],
-    "explanation": "Оба мода перехватывают и перестраивают экран отладки F3 (DebugScreenOverlay). При одновременной установке строки отладки дублируются или ломаются.",
-    "recommendation": "Используйте актуальный Compact F3 Plus и удалите старый Improved F3."
-  },
-  {
-    "title": "Конфликт ранних экранов загрузки (Smooth Loading Screens ↔ Early Loading Screen ↔ SplashScreen)",
-    "category": "Загрузка игры и ресурспаков",
-    "conflictingMods": [
-      "Smooth Loading Screens",
-      "Early Loading Screen",
-      "SplashScreen"
-    ],
-    "explanation": "Все три мода вмешиваются в раннее окно загрузки Forge и поток отрисовки сплэш-скрина до полного старта игры. Одновременная работа вызывает мерцание окна или вылет на этапе инициализации GLFW/OpenGL.",
-    "recommendation": "Оставьте максимум один мод плавного экрана загрузки (обычно достаточно Smooth Loading Screens или встроенной оптимизации ModernFix)."
-  },
-  {
-    "title": "Дублирование усыпления сущностей (EntitySleep / Enttick / Sleepium / Martensite)",
-    "category": "Тики, TPS, сущности и ИИ",
-    "conflictingMods": [
-      "EntitySleep",
-      "Enttick",
-      "Sleepium",
-      "Martensite entity tick skiper"
-    ],
-    "explanation": "Все четыре мода используют схожие миксины пропуска тиков (tick-skipping / hibernation) далёких сущностей. Совместная установка вызывает двойной перехват тиков мобов и конфликты с ИИ.",
-    "recommendation": "Вместо набора мелких скипперов выберите лидера группы Immersive Optimization (или максимум один лёгкий мод сна)."
   }
 ]
-

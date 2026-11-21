@@ -591,7 +591,7 @@
     "healthTier": "yellow",
     "description": "Очень нишевый мод (~434 скачивания на CF, ~95 на Modrinth): кеширует DataFixerUpper при проверке устаревших структур датапаков.",
     "bestAlternative": "Главным проверенным ускорителем генерации структур является Structure Layout Optimizer (31M+ CF).",
-    "warning": "Требует библиотеку RinLib. Малоустановленный нишевый мод — используйте в дополнение к Structure Layout Optimizer только при реальных лагах DFU.",
+    "warning": "Малоустановленный нишевый мод — используйте в дополнение к Structure Layout Optimizer только при реальных лагах DFU.",
     "tags": [],
     "curseforgeUrl": "https://www.curseforge.com/minecraft/mc-mods/structure-dfu-cache",
     "groupId": "worldgen-chunks",
@@ -1875,11 +1875,11 @@
     "platform": "Forge",
     "installed": false,
     "status": "recommended",
-    "statusLabel": "Фикс падения гравия/песка",
+    "statusLabel": "Мастхэв для гравия/песка",
     "healthTier": "green",
-    "description": "Мод от SmartStreamLabs: устраняет падение FPS и лаги TPS при обрушении сотен блоков гравия и песка за счёт удаления лишних падающих сущностей поблизости с сохранением их дропа.",
-    "bestAlternative": "Полезно для шахт и выживания, если вы не строите фермы/ловушки на падающем песке.",
-    "warning": "Меняет механику ради FPS: удаляет лишние падающие сущности песка и гравия (дроп сохраняется), поэтому может нарушить редстоун-механизмы на падающем песке или бетоне.",
+    "description": "Полностью устраняет жуткие лаги и падение FPS до 1-2 кадров при одновременном падении сотен блоков гравия или песка в шахтах и пустынях.",
+    "bestAlternative": "Мастхэв для выживания в шахтах.",
+    "warning": "",
     "tags": [],
     "curseforgeUrl": "https://www.curseforge.com/minecraft/mc-mods/falling-blocks-fps-fix",
     "groupId": "tick-physics-engine",
@@ -1998,7 +1998,7 @@
     "isGroupLeader": false,
     "isGroupAddon": false,
     "addons": [],
-    "coveredBy": "Immersive Optimization",
+    "coveredBy": "Immersive Optimization.",
     "supersededBy": [
       "immersive-optimization"
     ]
@@ -2043,7 +2043,7 @@
     "isGroupLeader": false,
     "isGroupAddon": false,
     "addons": [],
-    "coveredBy": "ServerCore",
+    "coveredBy": "ServerCore.",
     "supersededBy": [
       "servercore"
     ]
@@ -2306,7 +2306,7 @@
     "isGroupLeader": false,
     "isGroupAddon": false,
     "addons": [],
-    "coveredBy": "ServerCore",
+    "coveredBy": "ServerCore.",
     "supersededBy": [
       "servercore"
     ]
@@ -2559,5 +2559,116 @@
     "supersededBy": [
       "noisiumed"
     ]
+  },
+  {
+    "id": "smooth-chunk-save",
+    "name": "Server Performance - Smooth Chunk Save",
+    "category": "Чанки и генерация мира",
+    "platform": "Forge",
+    "installed": false,
+    "status": "recommended",
+    "statusLabel": "Плавное сохранение чанков (40M+ CF)",
+    "healthTier": "green",
+    "description": "Очень популярный мод от someaddon (40M+ CF, требует Cupboard): распределяет запись изменённых чанков на диск равномерно по времени, полностью убирая периодические лаг-спайки при автосохранении мира.",
+    "bestAlternative": "Мастхэв для серверов и тяжёлых одиночных миров; совместим с C2MEF, Radium и Noisiumed.",
+    "warning": "Требует библиотеку Cupboard.",
+    "tags": [
+      "chunks",
+      "autosave",
+      "tps",
+      "someaddon",
+      "cupboard",
+      "forge"
+    ],
+    "curseforgeUrl": "https://www.curseforge.com/minecraft/mc-mods/smooth-chunk-save",
+    "groupId": "worldgen-chunks",
+    "groupTitle": "Генерация мира и загрузка чанков",
+    "isGroupLeader": false,
+    "isGroupAddon": true,
+    "addons": [],
+    "coveredBy": ""
+  },
+  {
+    "id": "chunk-sending",
+    "name": "Chunk Sending",
+    "category": "Сеть",
+    "platform": "Forge",
+    "installed": false,
+    "status": "recommended",
+    "statusLabel": "Приоритет сетевых чанков (20M+ CF)",
+    "healthTier": "green",
+    "description": "Популярный сетевой оптимизатор от someaddon (20M+ CF, требует Cupboard): расставляет приоритеты отправки чанков игроку (сначала ближайшие и перед глазами) и сглаживает сетевые всплески при телепортах и входе.",
+    "bestAlternative": "Отлично дополняет Connectivity и Krypton Reno в мультиплеере.",
+    "warning": "Требует библиотеку Cupboard.",
+    "tags": [
+      "network",
+      "chunks",
+      "packets",
+      "someaddon",
+      "cupboard",
+      "forge"
+    ],
+    "curseforgeUrl": "https://www.curseforge.com/minecraft/mc-mods/chunk-sending",
+    "groupId": "networking",
+    "groupTitle": "Сетевой стек, пинг и пакеты",
+    "isGroupLeader": false,
+    "isGroupAddon": true,
+    "addons": [],
+    "coveredBy": ""
+  },
+  {
+    "id": "structure-essentials",
+    "name": "Structure Essentials",
+    "category": "Чанки и генерация мира",
+    "platform": "Forge",
+    "installed": false,
+    "status": "recommended",
+    "statusLabel": "Оптимизация поиска структур (20M+ CF)",
+    "healthTier": "green",
+    "description": "Мод от someaddon (20M+ CF, требует Cupboard): оптимизирует и ограничивает поиск структур (/locate, карты сокровищ жителей и модовые компасы), предотвращая зависание серверного потока на 5–20 секунд.",
+    "bestAlternative": "Отлично работает вместе с Structure Layout Optimizer (ускоряет поиск, а SLO — саму генерацию).",
+    "warning": "Требует библиотеку Cupboard.",
+    "tags": [
+      "structures",
+      "locate",
+      "tps",
+      "someaddon",
+      "cupboard",
+      "forge"
+    ],
+    "curseforgeUrl": "https://www.curseforge.com/minecraft/mc-mods/structure-essentials",
+    "groupId": "worldgen-chunks",
+    "groupTitle": "Генерация мира и загрузка чанков",
+    "isGroupLeader": false,
+    "isGroupAddon": true,
+    "addons": [],
+    "coveredBy": ""
+  },
+  {
+    "id": "too-fast",
+    "name": "Too Fast",
+    "category": "Тики, TPS, сущности и ИИ",
+    "platform": "Forge",
+    "installed": false,
+    "status": "recommended",
+    "statusLabel": "Фикс отбросов скорости (20M+ CF)",
+    "healthTier": "green",
+    "description": "Популярный серверный фикс (20M+ CF): убирает жёсткие ванильные ограничения скорости ('Player moved too quickly!'), избавляя от телепортов назад, лагов с джетпаками/элитрами и спама в консоль.",
+    "bestAlternative": "Необходим в сборках с быстрым перемещением, магией и на серверах.",
+    "warning": "",
+    "tags": [
+      "movement",
+      "rubberband",
+      "server",
+      "tps",
+      "forge"
+    ],
+    "curseforgeUrl": "https://www.curseforge.com/minecraft/mc-mods/too-fast",
+    "groupId": "tick-physics-engine",
+    "groupTitle": "Тики сервера (TPS), физика и ИИ мобов",
+    "isGroupLeader": false,
+    "isGroupAddon": true,
+    "addons": [],
+    "coveredBy": ""
   }
 ]

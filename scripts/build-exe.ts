@@ -12,7 +12,7 @@ const PUBLIC_DOWNLOADS_DIR = path.join(ROOT, 'public', 'downloads');
 const EXE_FILENAME = 'ModOptimizer-Forge-1.20.1-win-x64.exe';
 
 function resolveGoBin(): string {
-  const candidates = ['/usr/local/go/bin/go', 'go'];
+  const candidates = ['/usr/local/go/bin/go', '/tmp/go/bin/go', 'go'];
   for (const bin of candidates) {
     try {
       execSync(`${bin} version`, { stdio: 'ignore' });
@@ -82,7 +82,7 @@ function main(): void {
   const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
   const meta = {
     filename: EXE_FILENAME,
-    version: '1.2.0',
+    version: '1.2.1',
     platform: 'windows-x64',
     sizeBytes: buf.length,
     sha256,

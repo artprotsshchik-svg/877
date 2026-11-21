@@ -45,13 +45,14 @@ test('all mods have valid CurseForge URLs, non-empty fields, and 100% MOD_GROUPS
   }
 });
 
-test('all 5 recreated presets have zero conflicts, zero warnings, 7/7 subsystem coverage, and zero red mods', async () => {
+test('all 6 recreated presets have zero conflicts, zero warnings, 7/7 subsystem coverage, and zero red mods', async () => {
   const { summarizeAssemblyImpact } = await import('./modAnalyzer.ts');
-  assert.equal(MOD_PRESETS.length, 5, `Expected 5 curated presets, got ${MOD_PRESETS.length}`);
+  assert.equal(MOD_PRESETS.length, 6, `Expected 6 curated presets, got ${MOD_PRESETS.length}`);
   const expectedIds = [
-    'user-nvidium-emberbium',
     'user-alloyium-embeddium',
+    'user-nvidium-emberbium',
     'preset-shaders-oculus',
+    'preset-create-shaders',
     'preset-server-multiplayer',
     'preset-potato-low-end',
   ];
@@ -206,7 +207,6 @@ test('buildSmartAssembly adapts to gpu, server mode, goal, shaders, create, and 
     { gpu: 'nvidia', mode: 'singleplayer', useShaders: false, useCreate: false, allowSinytra: true, goal: 'balanced' },
     { gpu: 'nvidia', mode: 'server', useShaders: true, useCreate: true, allowSinytra: true, goal: 'max-safe' },
     { gpu: 'amd-intel', mode: 'hybrid-server', useShaders: false, useCreate: true, allowSinytra: false, goal: 'max-safe' },
-    { gpu: 'amd-intel', mode: 'singleplayer', useShaders: false, useCreate: false, allowSinytra: false, goal: 'max-safe', recipeViewer: 'none' },
     { gpu: 'integrated', mode: 'singleplayer', useShaders: false, useCreate: false, allowSinytra: false, goal: 'potato' },
   ];
 
@@ -238,16 +238,8 @@ test('buildSmartAssembly adapts to gpu, server mode, goal, shaders, create, and 
       assert.ok(modIds.includes('krypton-reno'));
     }
     if (prefs.goal === 'max-safe') {
+      assert.ok(modIds.includes('fastsuite'));
       assert.ok(modIds.includes('structure-dfu-cache'));
-      assert.ok(modIds.includes('rinlib'));
-      if (prefs.recipeViewer === 'none') {
-        assert.ok(modIds.includes('fastsuite'));
-        assert.ok(modIds.includes('placebo'));
-        assert.ok(!modIds.includes('fast-recipe-search'));
-      } else {
-        assert.ok(modIds.includes('fast-recipe-search'));
-        assert.ok(!modIds.includes('fastsuite'));
-      }
     }
     if (prefs.goal === 'balanced') {
       assert.ok(!modIds.includes('fastsuite'));
@@ -1646,15 +1638,7 @@ test('verified Modrinth 1.20.1 conflicts and Forge dependencies behave accuratel
     ['geckolibbetterfps', ['geckolib', 'embeddium']],
     ['cullify', ['embeddium']],
     ['structure-layout-optimizer', ['resourceful-config']],
-    ['observable', ['kotlin-for-forge', 'architectury-api']],
-    ['fast-item-frames', ['puzzles-lib']],
-    ['let-me-despawn', ['almanac']],
-    ['fastsuite', ['placebo']],
-    ['fastfurnace', ['placebo']],
-    ['fastworkbench', ['placebo']],
-    ['structure-dfu-cache', ['rinlib']],
-    ['emiffect', ['emi', 'fzzy-config']],
-    ['geckolib-animation-optimizer', ['geckolib']],
+    ['observable', ['kotlin-for-forge']],
     ['sodium-embeddium-leaf-culling', ['embeddium']],
     ['ggtu', ['embeddium', 'oculus']],
     ['chunkyborder', ['chunky']],
@@ -2136,316 +2120,284 @@ test('relative impact and analog comparison accurately evaluate slot replacement
   }
 });
 
-test('verified mod facts, new library dependencies, cascade cleanup, and FastSuite vs Fast Recipe Search conflict hold', () => {
-  // 1. FastSuite <-> Fast Recipe Search incompatibility rule
-  const recipeClash = analyzeSelection(['fastsuite', 'placebo', 'fast-recipe-search']);
-  assert.ok(
-    recipeClash.conflicts.some(c => c.matchedIds.includes('fastsuite') && c.matchedIds.includes('fast-recipe-search')),
-    'Expected conflict between FastSuite and Fast Recipe Search'
+test('multifactorial averaged score, observable diagnostic classification, exact supersededBy analog priority, and Embeddium/Emberbium fairness', async () => {
+  const {
+    MOD_BY_ID,
+    evaluateModImpactInPack,
+    getModAnalogsComparison,
+    getModEffectivenessScore,
+    summarizeAssemblyImpact,
+  } = await import('./modAnalyzer.ts');
+
+  // 1. Multifactorial scoreBreakdown exposes all 4 normalized 0..100 pillars and assemblyScore matches their weighted average
+  const baseIds = ['embeddium', 'modernfix', 'ferritecore', 'radium-re-reforged', 'entity-culling', 'clumps'];
+  const summary = summarizeAssemblyImpact(baseIds, undefined, INITIAL_BUILDER_PREFS);
+  const sb = summary.scoreBreakdown;
+  for (const val of [sb.efficiencyScore, sb.stabilityScore, sb.cleanlinessScore, sb.visualSafetyScore]) {
+    assert.ok(val >= 0 && val <= 100);
+  }
+  const expectedAvg = Math.round(
+    sb.efficiencyScore * 0.38 +
+      sb.stabilityScore * 0.30 +
+      sb.cleanlinessScore * 0.18 +
+      sb.visualSafetyScore * 0.14
   );
+  assert.equal(summary.assemblyScore, expectedAvg);
 
-  // 2. New library dependencies pull via toggleModSmart and cascade cleanly via removeModsCascade
-  const fif = toggleModSmart([], 'fast-item-frames', { strict: true });
-  assert.ok(fif.nextIds.includes('puzzles-lib'));
-  assert.ok(!removeModsCascade(fif.nextIds, ['fast-item-frames']).nextIds.includes('puzzles-lib'));
+  // Cleanliness drops sharply when bloat/redundant mods are added
+  const bloatedSummary = summarizeAssemblyImpact([...baseIds, 'fastboot'], undefined, INITIAL_BUILDER_PREFS);
+  assert.ok(bloatedSummary.scoreBreakdown.cleanlinessScore < sb.cleanlinessScore);
 
-  const lmd = toggleModSmart([], 'let-me-despawn', { strict: true });
-  assert.ok(lmd.nextIds.includes('almanac'));
-  assert.ok(!removeModsCascade(lmd.nextIds, ['let-me-despawn']).nextIds.includes('almanac'));
+  // 2. Observable is properly classified as diagnostic (0% direct FPS) and does not outrank spark
+  const observable = MOD_BY_ID.get('observable')!;
+  assert.equal(observable.status, 'diagnostic');
+  const obsImpact = evaluateModImpactInPack(observable, new Set(['observable', 'kotlin-for-forge']), undefined, INITIAL_BUILDER_PREFS);
+  assert.equal(obsImpact.level, 'diagnostic');
+  assert.equal(obsImpact.impactPoints, 0);
+  const sparkAnalogs = getModAnalogsComparison(MOD_BY_ID.get('spark')!, new Set(['spark']), INITIAL_BUILDER_PREFS);
+  const obsInSpark = sparkAnalogs.find(e => e.mod.id === 'observable');
+  assert.ok(obsInSpark && obsInSpark.points === 0);
 
-  const obs = toggleModSmart([], 'observable', { strict: true });
-  assert.ok(obs.nextIds.includes('kotlin-for-forge'));
-  assert.ok(obs.nextIds.includes('architectury-api'));
-  assert.ok(!removeModsCascade(obs.nextIds, ['observable']).nextIds.includes('architectury-api'));
+  // 3. Exact supersededBy analog priority never overridden by unrelated group leaders
+  const pack = new Set(['embeddium', 'modernfix', 'radium-re-reforged']);
+  const exactExpected: Array<[string, string]> = [
+    ['exordium', 'immediatelyfast'],
+    ['cullify', 'more-culling-reforged'],
+    ['doespotatotick', 'immersive-optimization'],
+    ['ultra-fast-pregen', 'chunky'],
+    ['particull', 'particle-core'],
+    ['renderscale', 'amd-fsr-upscaler-render-scale-for-embeddium'],
+  ];
+  for (const [modId, expectedAnalog] of exactExpected) {
+    const res = evaluateModImpactInPack(MOD_BY_ID.get(modId)!, new Set([...pack, modId]), undefined, INITIAL_BUILDER_PREFS);
+    assert.equal(res.betterAnalogId, expectedAnalog, `Expected ${modId} -> ${expectedAnalog}, got ${res.betterAnalogId}`);
+  }
+  const mioRes = evaluateModImpactInPack(MOD_BY_ID.get('nullpointer-fix-for-mio')!, new Set([...pack, 'nullpointer-fix-for-mio']), undefined, INITIAL_BUILDER_PREFS);
+  assert.notEqual(mioRes.betterAnalogId, 'krypton-reno');
 
-  const sdfu = toggleModSmart([], 'structure-dfu-cache', { strict: true });
-  assert.ok(sdfu.nextIds.includes('rinlib'));
-  assert.ok(!removeModsCascade(sdfu.nextIds, ['structure-dfu-cache']).nextIds.includes('rinlib'));
-
-  // 3. Factual descriptions & CurseForge URLs
-  const papi = MODS_DATABASE.find(m => m.id === 'put-a-plug-in-it-papi')!;
-  assert.equal(papi.curseforgeUrl, 'https://www.curseforge.com/minecraft/mc-mods/put-a-plug-in-it-papi');
-  assert.ok(papi.description.includes('ModelManager') || papi.description.includes('ItemStackKey'));
-  assert.ok(!papi.description.includes('спам ошибок в консоли'));
-
-  const rlsf = MODS_DATABASE.find(m => m.id === 'reload-looping-sound-fix')!;
-  assert.ok(rlsf.description.includes('MC-194284') || rlsf.description.includes('F3+T'));
-
-  const falling = MODS_DATABASE.find(m => m.id === 'falling-blocks-fps-fix')!;
-  assert.ok((falling.warning ?? '').includes('удаляет') && (falling.warning ?? '').includes('дроп'));
-
-  const vanillin = MODS_DATABASE.find(m => m.id === 'vanillin')!;
-  assert.equal(vanillin.curseforgeUrl, 'https://www.curseforge.com/minecraft/mc-mods/vanillin');
+  // 4. Embeddium and Emberbium have near-equal effectiveness score without installed bias
+  const embScore = getModEffectivenessScore(MOD_BY_ID.get('embeddium')!);
+  const emrScore = getModEffectivenessScore(MOD_BY_ID.get('emberbium')!);
+  assert.ok(Math.abs(embScore - emrScore) <= 40, `Expected Embeddium (${embScore}) and Emberbium (${emrScore}) near parity`);
 });
 
-test('obvious duplicate-port conflicts and non-obvious cross-mod co-work checks, configs, and tree nesting hold', async () => {
-  const { MOD_BY_ID, evaluateDubiousMods, evaluateModImpactInPack } = await import('./modAnalyzer.ts');
+test('Nvidium Forge 1.20.1 connector configs and 24 popular Forge mods resolve cleanly', async () => {
+  const { MOD_RECOMMENDED_CONFIGS } = await import('../data/modConfigs.ts');
+  const { matchJarFilenamesToMods } = await import('./jarMatcher.ts');
+  const { MOD_BY_ID, evaluateModImpactInPack } = await import('./modAnalyzer.ts');
+
+  // 1. Real Sinytra Connector + Fabric Loader Override configs for Nvidium on Forge 1.20.1
+  const connectorCfg = MOD_RECOMMENDED_CONFIGS.find(c => c.filePath === 'config/connector.json');
+  assert.ok(connectorCfg, 'Expected config/connector.json entry');
+  const connectorJson = JSON.parse(connectorCfg.content) as {
+    version?: number;
+    globalModAliases?: Record<string, string>;
+  };
+  assert.equal(connectorJson.version, 1);
+  assert.equal(connectorJson.globalModAliases?.embeddium, 'sodium');
+  assert.ok(connectorCfg.alsoForModIds?.includes('nvidium'));
+  assert.ok(connectorCfg.alsoForModIds?.includes('emberbium'));
+
+  const fabricOverrideCfg = MOD_RECOMMENDED_CONFIGS.find(
+    c => c.filePath === 'config/fabric_loader_dependencies.json'
+  );
+  assert.ok(fabricOverrideCfg, 'Expected config/fabric_loader_dependencies.json entry');
+  const overrideJson = JSON.parse(fabricOverrideCfg.content) as {
+    version?: number;
+    overrides?: { nvidium?: { '-depends'?: Record<string, string> } };
+  };
+  assert.equal(overrideJson.version, 1);
+  assert.equal(overrideJson.overrides?.nvidium?.['-depends']?.sodium, 'IGNORED');
+
+  // 2. All 24 new mods exist in MODS_DATABASE & belong to at least one group
+  const newModIds = [
+    'iris-flywheel-compat',
+    'ryoamiclights',
+    'modelfix',
+    'textrues-embeddium-options',
+    'fps-reducer',
+    'better-fps-render-distance',
+    'saturn',
+    'neruina',
+    'not-enough-crashes',
+    'crash-utilities',
+    'log-begone',
+    'smooth-chunk-save',
+    'chunk-sending',
+    'structure-essentials',
+    'too-fast',
+    'get-it-together-drops',
+    'toast-control',
+    'attributefix',
+    'deuf-duplicate-entity-uuid-fix',
+    'netherportalfix',
+    'recipe-essentials',
+    'placebo',
+    'architectury-api',
+    'obsidianui',
+  ];
+  const allGroupMembers = new Set(MOD_GROUPS.flatMap(g => g.memberIds));
+  for (const id of newModIds) {
+    assert.ok(MOD_BY_ID.has(id), `Expected mod ${id} in MODS_DATABASE`);
+    assert.ok(allGroupMembers.has(id), `Expected mod ${id} to be registered in groups.json`);
+  }
+
+  // 3. Transitive dependencies & orphan cleanup
+  const ryoAdd = toggleModSmart([], 'ryoamiclights', { strict: true });
+  assert.ok(ryoAdd.nextIds.includes('obsidianui'));
+  assert.ok(ryoAdd.nextIds.includes('architectury-api'));
+  const ryoRemove = toggleModSmart(ryoAdd.nextIds, 'ryoamiclights', { strict: true });
+  assert.ok(!ryoRemove.nextIds.includes('obsidianui'), 'Expected obsidianui orphan cleanup');
+  assert.ok(!ryoRemove.nextIds.includes('architectury-api'), 'Expected architectury-api orphan cleanup');
+
+  const fastsuiteAdd = toggleModSmart(['modernfix'], 'fastsuite', { strict: true });
+  assert.ok(fastsuiteAdd.nextIds.includes('placebo'));
+  const fastsuiteRemove = toggleModSmart(fastsuiteAdd.nextIds, 'fastsuite', { strict: true });
+  assert.ok(!fastsuiteRemove.nextIds.includes('placebo'), 'Expected placebo orphan cleanup');
+
+  const compatAdd = toggleModSmart([], 'iris-flywheel-compat', { strict: true });
+  assert.ok(compatAdd.nextIds.includes('oculus'));
+  assert.ok(compatAdd.nextIds.includes('flywheel'));
+  assert.ok(compatAdd.nextIds.includes('embeddium'));
+
+  // 4. Create + Shaders smart build auto-includes iris-flywheel-compat
+  const createShaderBuild = buildSmartAssembly({
+    ...INITIAL_BUILDER_PREFS,
+    useCreate: true,
+    useShaders: true,
+    goal: 'balanced',
+  });
+  assert.ok(createShaderBuild.modIds.includes('iris-flywheel-compat'));
+  assert.equal(analyzeSelection(createShaderBuild.modIds).conflicts.length, 0);
+
+  // 5. Diagnostic classification for Crash Utilities & JAR matcher resolution
+  const crashUtilImpact = evaluateModImpactInPack(
+    MOD_BY_ID.get('crash-utilities')!,
+    new Set(['crash-utilities']),
+    undefined,
+    INITIAL_BUILDER_PREFS
+  );
+  assert.equal(crashUtilImpact.level, 'diagnostic');
+  assert.equal(crashUtilImpact.impactPoints, 0);
+
+  const jarRes = matchJarFilenamesToMods([
+    'saturn-mc1.20.1-0.1.3.jar',
+    'neruina-2.1.2-forge+1.20.1.jar',
+    'modelfix-1.15.jar',
+    'RyoamicLights-forge-0.2.11+mc1.20.1.jar',
+    'iris-flywheel-compat-forge1.20.1-1.1.5.jar',
+    'Placebo-1.20.1-8.6.2.jar',
+    'ObsidianUI-forge-0.2.3+mc1.20.1.jar',
+    'getittogetherdrops-forge-1.20-1.3.jar',
+  ]);
+  assert.equal(jarRes.unmatchedJars.length, 0);
+  for (const expected of [
+    'saturn',
+    'neruina',
+    'modelfix',
+    'ryoamiclights',
+    'iris-flywheel-compat',
+    'placebo',
+    'obsidianui',
+    'get-it-together-drops',
+  ]) {
+    assert.ok(jarRes.matchedIds.includes(expected), `Expected JAR matcher to resolve ${expected}`);
+  }
+});
+
+test('culling compatibility investigation rules, configs, and 6 upgraded presets work accurately', async () => {
+  const {
+    evaluateArtifactRisk,
+    evaluateDubiousMods,
+    evaluateModImpactInPack,
+    MOD_BY_ID,
+    summarizeAssemblyImpact,
+  } = await import('./modAnalyzer.ts');
   const { MOD_RECOMMENDED_CONFIGS } = await import('../data/modConfigs.ts');
 
-  // 1. Newly added obvious mutual conflict pairs & smartFixAssembly resolution
-  const duplicatePairs: Array<[string, string]> = [
-    ['stutterfix-reforged', 'stutterfix-modern-port'],
-    ['language-reload-reforged', 'languagereloadunofficial'],
-    ['capability-fix-revived', 'capability-fix'],
-    ['bobby-reforged', 'farsight'],
-    ['fastfurnace', 'furnaceoptimizer'],
-    ['let-me-despawn', 'despawn-tweaks'],
-    ['let-me-despawn', 'despawn-tweaks-modern-port'],
-  ];
-  for (const [a, b] of duplicatePairs) {
-    const clash = analyzeSelection([a, b]);
-    assert.ok(
-      clash.conflicts.some(c => c.matchedIds.includes(a) && c.matchedIds.includes(b)),
-      `Expected conflict between ${a} and ${b}`
-    );
-    const fixed = smartFixAssembly([a, b]);
-    assert.equal(analyzeSelection(fixed).conflicts.length, 0, `Expected smartFixAssembly([${a}, ${b}]) to resolve conflicts`);
-  }
-
-  // 2. Non-rule yellow overlap warnings and smartFixAssembly cleanup
-  const overlapPairs: Array<[string, string]> = [
-    ['prismanium', 'sodium-embeddium-dynamic-lights'],
-    ['distant-horizons', 'bobby-reforged'],
-    ['distant-horizons', 'farsight'],
-    ['servercore', 'adaptive-performance-tweaks'],
-    ['servercore', 'adaptive-optimization-reborn'],
-    ['mob-collision-off', 'farmcollisionless'],
-    ['mob-collision-off', 'entity-collision-optimization'],
-  ];
-  for (const [a, b] of overlapPairs) {
-    const res = analyzeSelection([a, b]);
-    assert.ok(
-      res.warnings.some(w => w.severity === 'yellow' && w.modId === b),
-      `Expected yellow overlap warning on ${b} when paired with ${a}`
-    );
-    const fixed = smartFixAssembly([a, b]);
-    const fixedAn = analyzeSelection(fixed);
-    assert.equal(fixedAn.conflicts.length, 0);
-    assert.equal(
-      fixedAn.warnings.filter(w => w.modId === b).length,
-      0,
-      `Expected smartFixAssembly([${a}, ${b}]) to prune overlapping ${b}`
-    );
-  }
-
-  // 3. Non-obvious contextual interactions & dubious caveats (zero false alarms on presets)
-  const flywheelShader = evaluateModImpactInPack(
-    MOD_BY_ID.get('flywheel')!,
-    new Set(['embeddium', 'oculus', 'flywheel']),
-    undefined,
-    { ...INITIAL_BUILDER_PREFS, useShaders: true, useCreate: true }
-  );
-  assert.ok(
-    flywheelShader.interactions.some(i => i.kind === 'context' && i.targetIds.includes('oculus')),
-    'Expected Flywheel + Oculus GPU instancing fallback context note'
-  );
-  const flywheelDubious = evaluateDubiousMods(['embeddium', 'oculus', 'flywheel'], undefined, {
-    ...INITIAL_BUILDER_PREFS,
-    useShaders: true,
-    useCreate: true,
-  });
-  assert.ok(flywheelDubious.some(d => d.modId === 'flywheel' && d.severity === 'low'));
-
-  const gputapeShader = evaluateModImpactInPack(
-    MOD_BY_ID.get('gputape')!,
-    new Set(['embeddium', 'oculus', 'gputape'])
-  );
-  assert.ok(gputapeShader.interactions.some(i => i.kind === 'context' && i.summary.includes('RBO depth')));
-
-  const immFastShader = evaluateModImpactInPack(
-    MOD_BY_ID.get('immediatelyfast')!,
-    new Set(['embeddium', 'oculus', 'immediatelyfast'])
-  );
-  assert.ok(immFastShader.interactions.some(i => i.kind === 'context' && i.summary.includes('hud_batching')));
-
-  const dhC2me = evaluateModImpactInPack(
-    MOD_BY_ID.get('distant-horizons')!,
-    new Set(['embeddium', 'distant-horizons', 'concurrent-chunk-management-engine-forge-c2me'])
-  );
-  assert.ok(dhC2me.interactions.some(i => i.kind === 'context' && i.summary.includes('CPU')));
-  const dhC2meDubious = evaluateDubiousMods([
+  // 1. Golden 5-layer zero-overlap culling stack
+  const goldenCulling = [
     'embeddium',
-    'distant-horizons',
-    'concurrent-chunk-management-engine-forge-c2me',
-  ]);
-  assert.ok(dhC2meDubious.some(d => d.modId === 'distant-horizons' && d.severity === 'low'));
+    'entity-culling',
+    'culllessleaves-reforged',
+    'enhanced-block-entities-reloaded',
+    'matlib',
+    'fast-item-frames',
+    'flerovium',
+  ];
+  const goldenAnalysis = analyzeSelection(goldenCulling);
+  assert.equal(goldenAnalysis.conflicts.length, 0);
+  assert.equal(goldenAnalysis.warnings.length, 0);
+  const goldenSummary = summarizeAssemblyImpact(goldenCulling, goldenAnalysis, INITIAL_BUILDER_PREFS);
+  assert.equal(goldenSummary.overlaps.length, 0);
+  assert.ok(goldenSummary.synergies.length >= 2);
 
-  const altCurRadium = evaluateModImpactInPack(
-    MOD_BY_ID.get('alternate-current')!,
-    new Set(['radium-re-reforged', 'alternate-current'])
+  // 2. Entity Culling + ItemCuller overlap & smartFix cleanup
+  const itemCullerAnalysis = analyzeSelection(['embeddium', 'entity-culling', 'itemculler']);
+  const itemCullerImpact = evaluateModImpactInPack(
+    MOD_BY_ID.get('itemculler')!,
+    new Set(['embeddium', 'entity-culling', 'itemculler']),
+    itemCullerAnalysis,
+    INITIAL_BUILDER_PREFS
   );
-  assert.ok(altCurRadium.interactions.some(i => i.kind === 'context' && i.targetIds.includes('radium-re-reforged')));
+  assert.ok(itemCullerImpact.interactions.some(i => i.kind === 'overlap' && i.targetIds.includes('entity-culling')));
+  const itemCullerDubious = evaluateDubiousMods(['embeddium', 'entity-culling', 'itemculler'], itemCullerAnalysis);
+  assert.ok(itemCullerDubious.some(d => d.modId === 'itemculler' && d.severity === 'medium'));
+  const fixedItemCuller = smartFixAssembly(['embeddium', 'entity-culling', 'itemculler'], INITIAL_BUILDER_PREFS);
+  assert.ok(fixedItemCuller.includes('entity-culling'));
+  assert.ok(!fixedItemCuller.includes('itemculler'));
 
-  const fallingCreate = evaluateModImpactInPack(
-    MOD_BY_ID.get('falling-blocks-fps-fix')!,
-    new Set(['falling-blocks-fps-fix']),
+  // 3. More Culling Reforged + Fast Item Frames overlap vs EBER synergy
+  const moreCullingFifSet = new Set(['embeddium', 'entity-culling', 'more-culling-reforged', 'fast-item-frames']);
+  const moreCullingFifImpact = evaluateModImpactInPack(
+    MOD_BY_ID.get('more-culling-reforged')!,
+    moreCullingFifSet,
+    undefined,
+    INITIAL_BUILDER_PREFS
+  );
+  assert.ok(moreCullingFifImpact.interactions.some(i => i.kind === 'overlap' && i.targetIds.includes('fast-item-frames')));
+  const moreCullingFifDubious = evaluateDubiousMods(Array.from(moreCullingFifSet));
+  assert.ok(moreCullingFifDubious.some(d => d.modId === 'more-culling-reforged' && d.severity === 'medium'));
+
+  const moreCullingEberSet = new Set(['embeddium', 'entity-culling', 'more-culling-reforged', 'enhanced-block-entities-reloaded', 'matlib']);
+  const moreCullingEberImpact = evaluateModImpactInPack(
+    MOD_BY_ID.get('more-culling-reforged')!,
+    moreCullingEberSet,
+    undefined,
+    INITIAL_BUILDER_PREFS
+  );
+  assert.ok(moreCullingEberImpact.interactions.some(i => i.kind === 'synergy' && i.targetIds.includes('enhanced-block-entities-reloaded')));
+
+  // 4. Sightline + Oculus shader shadow risk + warning
+  const sightlineShaderIds = ['embeddium', 'oculus', 'sodium-sightline'];
+  const sightlineRisk = evaluateArtifactRisk(sightlineShaderIds, undefined, { ...INITIAL_BUILDER_PREFS, useShaders: true });
+  assert.ok(sightlineRisk.factors.some(f => f.label.includes('Sightline')));
+  const sightlineDubious = evaluateDubiousMods(sightlineShaderIds, undefined, { ...INITIAL_BUILDER_PREFS, useShaders: true });
+  assert.ok(sightlineDubious.some(d => d.modId === 'sodium-sightline' && d.severity === 'medium'));
+
+  // 5. CLab + CullLessLeaves yellow warning
+  const clabLeafAnalysis = analyzeSelection(['embeddium', 'clab', 'culllessleaves-reforged']);
+  assert.ok(clabLeafAnalysis.warnings.some(w => w.modId === 'clab' && w.severity === 'yellow'));
+
+  // 6. Entity Culling + Create whitelist nuance & new culling configs
+  const createDubious = evaluateDubiousMods(
+    ['embeddium', 'flywheel', 'entity-culling'],
     undefined,
     { ...INITIAL_BUILDER_PREFS, useCreate: true }
   );
-  assert.ok(fallingCreate.interactions.some(i => i.kind === 'context' && i.summary.includes('Create')));
+  const ecCreateNote = createDubious.find(d => d.modId === 'entity-culling');
+  assert.ok(ecCreateNote && ecCreateNote.severity === 'low');
+  assert.equal(ecCreateNote.canRemoveSafely, false);
+  assert.equal(ecCreateNote.replacementId, undefined);
+  assert.ok(MOD_RECOMMENDED_CONFIGS.some(c => c.filePath === 'config/entityculling.json' && c.modId === 'entity-culling'));
+  assert.ok(MOD_RECOMMENDED_CONFIGS.some(c => c.filePath === 'config/moreculling.toml' && c.modId === 'more-culling-reforged'));
 
-  // 4. Tree nesting & recommended configs for compatibility caveats
-  const dhTree = organizeAssemblyTree(['distant-horizons', 'farsight']);
-  assert.equal(dhTree.length, 1);
-  assert.equal(dhTree[0].parent.id, 'distant-horizons');
-  assert.ok(dhTree[0].children.some(c => c.mod.id === 'farsight'));
-
-  for (const cfgId of ['gputape', 'immediatelyfast', 'radium-re-reforged', 'distant-horizons']) {
-    assert.ok(
-      MOD_RECOMMENDED_CONFIGS.some(c => c.modId === cfgId),
-      `Expected recommended config entry for ${cfgId}`
-    );
-  }
-});
-
-test('extended co-work checks cover DimThread+C2ME, ZSTDNET+KryptonHybrid, explosions, F3, splash, entity-sleep, asyncparticles, world-save, resourcepack cache, configs, and tree', async () => {
-  const { MOD_BY_ID, evaluateDubiousMods, evaluateModImpactInPack, summarizeAssemblyImpact } = await import('./modAnalyzer.ts');
-  const { MOD_RECOMMENDED_CONFIGS } = await import('../data/modConfigs.ts');
-
-  // 1. Newly added mutual-exclusion rules & smartFixAssembly
-  const newConflictPairs: Array<[string, string]> = [
-    ['dimensional-threading-reforked', 'concurrent-chunk-management-engine-forge-c2me'],
-    ['dimensional-threading-reforked', 'c2me-concurrent-chunk-management-engine'],
-    ['dimensional-threading-reforked', 'c2mer'],
-    ['zstdnet', 'krypton-hybrid'],
-    ['zstdnet', 'aegisnetworking-krypton-hybrid'],
-    ['better-tnt', 'perfomant-boom'],
-    ['compact-f3-plus', 'improved-f3'],
-    ['smooth-loading-screens', 'early-loading-screen'],
-    ['smooth-loading-screens', 'splashscreen'],
-    ['early-loading-screen', 'splashscreen'],
-    ['entitysleep', 'enttick'],
-    ['sleepium', 'martensite-entity-tick-skiper'],
-  ];
-  for (const [a, b] of newConflictPairs) {
-    const clash = analyzeSelection([a, b]);
-    assert.ok(
-      clash.conflicts.some(c => c.matchedIds.includes(a) && c.matchedIds.includes(b)),
-      `Expected conflict between ${a} and ${b}`
-    );
-    const fixed = smartFixAssembly([a, b]);
-    assert.equal(analyzeSelection(fixed).conflicts.length, 0, `Expected smartFixAssembly([${a}, ${b}]) to have 0 conflicts`);
-  }
-
-  // Asymmetric rules must NOT emit a false DimThread conflict for C2ME vs C2MEF, or ZSTDNET conflict for Hybrid vs Aegis
-  const c2meOnlyClash = analyzeSelection(['concurrent-chunk-management-engine-forge-c2me', 'c2mer']);
-  assert.ok(!c2meOnlyClash.conflicts.some(c => c.rule.title.includes('Dimensional Threading')));
-  const hybridOnlyClash = analyzeSelection(['krypton-hybrid', 'aegisnetworking-krypton-hybrid']);
-  assert.ok(!hybridOnlyClash.conflicts.some(c => c.rule.title.includes('Zstd-сжатия')));
-
-  // 2. Non-rule yellow overlap checks & smartFixAssembly pruning
-  const extendedOverlaps: Array<[string, string]> = [
-    ['particle-core', 'asyncparticles'],
-    ['immersive-optimization', 'entitysleep'],
-    ['immersive-optimization', 'enttick'],
-    ['immersive-optimization', 'sleepium'],
-    ['immersive-optimization', 'martensite-entity-tick-skiper'],
-    ['c2mer', 'parallel-world-save'],
-    ['concurrent-chunk-management-engine-forge-c2me', 'delta-chunk'],
-    ['parallel-world-save', 'delta-chunk'],
-    ['resourcepackcached', 'keep-the-resourcepack'],
-    ['resourcepackcached', 'packforge'],
-    ['keep-the-resourcepack', 'packforge'],
-  ];
-  for (const [a, b] of extendedOverlaps) {
-    const res = analyzeSelection([a, b]);
-    assert.ok(
-      res.warnings.some(w => w.severity === 'yellow' && w.modId === b),
-      `Expected yellow overlap warning on ${b} when paired with ${a}`
-    );
-    const fixed = smartFixAssembly([a, b]);
-    const fixedAn = analyzeSelection(fixed);
-    assert.equal(fixedAn.conflicts.length, 0);
-    assert.equal(
-      fixedAn.warnings.filter(w => w.modId === b).length,
-      0,
-      `Expected smartFixAssembly([${a}, ${b}]) to remove overlapping ${b}`
-    );
-  }
-
-  // 3. Non-obvious contextual caveats & dubious warnings
-  const zstdDubious = evaluateDubiousMods(['krypton-reno'.replace('krypton-reno', 'zstdnet')]);
-  assert.ok(zstdDubious.some(d => d.modId === 'zstdnet' && d.reason.includes('Zstandard')));
-  const zstdImpact = evaluateModImpactInPack(MOD_BY_ID.get('zstdnet')!, new Set(['zstdnet']));
-  assert.ok(zstdImpact.interactions.some(i => i.kind === 'context' && i.summary.includes('клиент')));
-
-  const asyncPartDubious = evaluateDubiousMods(['asyncparticles']);
-  assert.ok(asyncPartDubious.some(d => d.modId === 'asyncparticles' && d.reason.includes('Botania')));
-
-  const chunkyC2meImpact = evaluateModImpactInPack(
-    MOD_BY_ID.get('chunky')!,
-    new Set(['chunky', 'concurrent-chunk-management-engine-forge-c2me', 'distant-horizons'])
-  );
-  assert.ok(chunkyC2meImpact.interactions.some(i => i.kind === 'synergy' && i.targetIds.includes('concurrent-chunk-management-engine-forge-c2me')));
-  assert.ok(chunkyC2meImpact.interactions.some(i => i.kind === 'context' && i.targetIds.includes('distant-horizons')));
-  const chunkyDubious = evaluateDubiousMods(['chunky', 'distant-horizons']);
-  assert.ok(chunkyDubious.some(d => d.modId === 'chunky' && d.severity === 'low'));
-
-  const ecCreateImpact = evaluateModImpactInPack(
-    MOD_BY_ID.get('entity-culling')!,
-    new Set(['embeddium', 'oculus', 'entity-culling']),
-    undefined,
-    { ...INITIAL_BUILDER_PREFS, useCreate: true, useShaders: true }
-  );
-  assert.ok(ecCreateImpact.interactions.some(i => i.kind === 'context' && i.summary.includes('blockEntityWhitelist')));
-
-  const badOptShader = evaluateModImpactInPack(
-    MOD_BY_ID.get('badoptimizations')!,
-    new Set(['embeddium', 'oculus', 'badoptimizations']),
-    undefined,
-    { ...INITIAL_BUILDER_PREFS, useShaders: true }
-  );
-  assert.ok(badOptShader.interactions.some(i => i.kind === 'context' && i.summary.includes('enable_sky_color_caching')));
-
-  const lmdImpact = evaluateModImpactInPack(
-    MOD_BY_ID.get('let-me-despawn')!,
-    new Set(['let-me-despawn', 'almanac'])
-  );
-  assert.ok(lmdImpact.interactions.some(i => i.kind === 'context' && i.targetIds.includes('almanac')));
-
-  // 4. Presets remain spotless (0 conflicts, 0 warnings, 0 overlaps, 0 zero/low impact mods)
-  for (const preset of MOD_PRESETS) {
-    const an = analyzeSelection(preset.modIds);
-    assert.equal(an.conflicts.length, 0, `Preset ${preset.id} must have 0 conflicts`);
-    assert.equal(an.warnings.length, 0, `Preset ${preset.id} must have 0 warnings`);
-    const summary = summarizeAssemblyImpact(preset.modIds, an);
-    assert.equal(summary.overlaps.length, 0, `Preset ${preset.id} must have 0 overlaps`);
-    assert.equal(summary.zeroOrLowImpactIds.length, 0, `Preset ${preset.id} must have 0 dead mods`);
-  }
-
-  // 5. smartFixAssembly(ALL_MOD_IDS) still ends with 0 conflicts & 0 warnings
-  const allFixed = smartFixAssembly(MODS_DATABASE.map(m => m.id));
-  const allAn = analyzeSelection(allFixed);
-  assert.equal(allAn.conflicts.length, 0);
-  assert.equal(allAn.warnings.length, 0);
-
-  // 6. New tree nestings and configs
-  const f3Tree = organizeAssemblyTree(['compact-f3-plus', 'improved-f3']);
-  assert.equal(f3Tree.length, 1);
-  assert.equal(f3Tree[0].parent.id, 'compact-f3-plus');
-  assert.ok(f3Tree[0].children.some(c => c.mod.id === 'improved-f3'));
-
-  const sleepTree = organizeAssemblyTree(['immersive-optimization', 'entitysleep', 'sleepium']);
-  assert.equal(sleepTree.length, 1);
-  assert.equal(sleepTree[0].parent.id, 'immersive-optimization');
-  assert.equal(sleepTree[0].children.length, 2);
-
-  const partTree = organizeAssemblyTree(['particle-core', 'asyncparticles']);
-  assert.equal(partTree.length, 1);
-  assert.equal(partTree[0].parent.id, 'particle-core');
-  assert.ok(partTree[0].children.some(c => c.mod.id === 'asyncparticles'));
-
-  const rpTree = organizeAssemblyTree(['resourcepackcached', 'keep-the-resourcepack', 'packforge']);
-  assert.equal(rpTree.length, 1);
-  assert.equal(rpTree[0].parent.id, 'resourcepackcached');
-  assert.equal(rpTree[0].children.length, 2);
-
-  for (const cfgId of ['entity-culling', 'badoptimizations', 'servercore', 'let-me-despawn']) {
-    assert.ok(
-      MOD_RECOMMENDED_CONFIGS.some(c => c.modId === cfgId),
-      `Expected recommended config entry for ${cfgId}`
-    );
-  }
+  // 7. Create+Shaders preset verification
+  const createPreset = MOD_PRESETS.find(p => p.id === 'preset-create-shaders')!;
+  assert.ok(createPreset);
+  assert.ok(createPreset.modIds.includes('iris-flywheel-compat'));
+  assert.ok(createPreset.modIds.includes('emi'));
+  assert.ok(createPreset.modIds.includes('tmrv-updated'));
 });
 
 

@@ -54,6 +54,23 @@ func TestIndexInjectsDesktopFlagAndServesMeta(t *testing.T) {
 	if meta.HotManifest == nil || meta.HotManifest.UpdatedAt != "16.11.2026" {
 		t.Fatalf("unexpected manifest: %+v", meta.HotManifest)
 	}
+
+	jsReq := httptest.NewRequest(http.MethodGet, "/assets/app.js", nil)
+	jsRec := httptest.NewRecorder()
+	h.ServeHTTP(jsRec, jsReq)
+	if jsRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for /assets/app.js, got %d", jsRec.Code)
+	}
+	if ct := jsRec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/javascript") {
+		t.Fatalf("expected application/javascript MIME type, got %q", ct)
+	}
+
+	jsonReq := httptest.NewRequest(http.MethodGet, "/data/manifest.json", nil)
+	jsonRec := httptest.NewRecorder()
+	h.ServeHTTP(jsonRec, jsonReq)
+	if ct := jsonRec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		t.Fatalf("expected application/json MIME type, got %q", ct)
+	}
 }
 
 func TestScanModsEndpointAndConnectorDetection(t *testing.T) {

@@ -11,6 +11,7 @@ export const NVIDIUM_CONFIG_CONTENT = `{
 export interface ModConfigEntry {
   modId: string;
   modName: string;
+  alsoForModIds?: string[];
   filePath: string;
   title: string;
   note: string;
@@ -23,21 +24,38 @@ export const MOD_RECOMMENDED_CONFIGS: ModConfigEntry[] = [
     modName: 'Nvidium',
     filePath: 'config/nvidium.json',
     title: 'Базовый конфиг Nvidium (управление VRAM и дальностью)',
-    note: 'Требует NVIDIA GTX 16xx / RTX 20xx+, отключённых шейдеров и алиаса sodium в config/connector.json при работе через Sinytra.',
+    note: 'Требует NVIDIA GTX 16xx / RTX 20xx+, отключённых шейдеров, алиаса в config/connector.json и обхода версии Sodium в config/fabric_loader_dependencies.json.',
     content: NVIDIUM_CONFIG_CONTENT,
   },
   {
     modId: 'sinytra-connector',
-    modName: 'Sinytra Connector',
+    modName: 'Sinytra Connector (для Nvidium)',
+    alsoForModIds: ['nvidium', 'emberbium'],
     filePath: 'config/connector.json',
-    title: 'Алиас Embeddium → Sodium для Fabric-аддонов',
-    note: 'Позволяет Fabric-модам (в т.ч. Nvidium) видеть Embeddium как Sodium.',
+    title: 'Рабочий алиас Embeddium / Emberbium → Sodium для Forge 1.20.1',
+    note: 'Ключ globalModAliases заставляет Nvidium (Fabric) видеть установленный Embeddium или Emberbium как Sodium на Forge 1.20.1.',
     content: `{
   "version": 1,
   "hiddenMods": [],
-  "dependencyOverrides": {
+  "globalModAliases": {
+    "embeddium": "sodium"
+  }
+}`,
+  },
+  {
+    modId: 'nvidium',
+    modName: 'Nvidium (Fabric Loader Override)',
+    alsoForModIds: ['sinytra-connector'],
+    filePath: 'config/fabric_loader_dependencies.json',
+    title: 'Снятие строгой проверки версии Sodium для запуска Nvidium на Forge',
+    note: 'Nvidium требует Sodium >=0.5.8, тогда как Embeddium 0.3.31 / Emberbium отдают другую версию. Этот конфиг убирает краш несовпадения версий при старте через Sinytra Connector.',
+    content: `{
+  "version": 1,
+  "overrides": {
     "nvidium": {
-      "sodium": ">=0.5.0"
+      "-depends": {
+        "sodium": "IGNORED"
+      }
     }
   }
 }`,
@@ -97,98 +115,47 @@ mode = "OFF"`,
 }`,
   },
   {
-    modId: 'gputape',
-    modName: 'GPUTape',
-    filePath: 'config/gputape.toml',
-    title: 'Безопасная очистка VRAM вместе с шейдерами Oculus / Emberlens',
-    note: 'Режим RBO depth ломает буферы глубины шейдерпаков — держите его выключенным при игре с Oculus.',
-    content: `[experimental]
-useRboDepth = false`,
-  },
-  {
-    modId: 'immediatelyfast',
-    modName: 'ImmediatelyFast',
-    filePath: 'config/immediatelyfast.json',
-    title: 'Тонкая настройка батчинга при работе с Oculus и тяжёлым HUD',
-    note: 'Если с шейдерами Oculus мерцает HUD, шрифт или таблички, отключите hud_batching или sign_text_buffering.',
-    content: `{
-  "hud_batching": true,
-  "font_atlas_resizing": true,
-  "map_atlas_generation": true,
-  "experimental_sign_text_buffering": false
-}`,
-  },
-  {
-    modId: 'radium-re-reforged',
-    modName: 'Radium Re-Reforged',
-    filePath: 'config/radium.properties',
-    title: 'Совместимость редстоуна (при использовании Alternate Current / сложных схем)',
-    note: 'Если установлен Alternate Current или есть редкий редстоун-механизм на точных таймингах, модуль redstone в Radium можно отключить.',
-    content: `mixin.block.redstone=false`,
-  },
-  {
-    modId: 'distant-horizons',
-    modName: 'Distant Horizons',
-    filePath: 'config/DistantHorizons.toml',
-    title: 'Снижение нагрузки на CPU при совместной работе с C2ME',
-    note: 'При одновременной работе Distant Horizons и C2ME ограничьте нагрузку на процессор до BALANCED или LOW_IMPACT, чтобы избежать микростаттеров.',
-    content: `[client.advanced.multiThreading]
-numberOfThreads = 2
-threadPriority = "BALANCED"`,
-  },
-  {
     modId: 'entity-culling',
-    modName: 'Entity Culling',
+    modName: 'Entity Culling (Совместимость с Create и маяками)',
+    alsoForModIds: ['flywheel', 'vanillin', 'enhanced-block-entities-reloaded'],
     filePath: 'config/entityculling.json',
-    title: 'Белый список механизмов Create и контейнеров при мерцании за стенами',
-    note: 'Если крупные механизмы Create, терминалы хранилищ или таблички на секунду пропадают при повороте камеры, добавьте их ID в blockEntityWhitelist.',
+    title: 'Безопасный whitelist для движущихся механизмов Create и маяков',
+    note: 'Исключает мерцание больших ветряков, водяных колёс и поездов Create за стенами без потери куллинга остальных мобов и сундуков EBER.',
     content: `{
   "configVersion": 5,
-  "renderNametagsThroughWalls": true,
+  "renderNametagsThroughWalls": false,
   "blockEntityWhitelist": [
     "minecraft:beacon",
-    "create:belt",
-    "create:flywheel"
+    "create:contraption",
+    "create:stationary_contraption",
+    "create:gantry_contraption",
+    "create:carriage_contraption"
   ],
-  "tickCulling": true
-}`,
-  },
-  {
-    modId: 'badoptimizations',
-    modName: 'BadOptimizations',
-    filePath: 'config/badoptimizations.txt',
-    title: 'Отключение кэша цвета неба при багах с шейдерами или погодными модами',
-    note: 'Если с шейдерами или модами на погоду небо меняет цвет рывками, отключите enable_sky_color_caching, оставив остальные микро-оптимизации.',
-    content: `enable_sky_color_caching=false
-enable_toast_optimizations=true
-enable_lightmap_caching=true`,
-  },
-  {
-    modId: 'servercore',
-    modName: 'ServerCore',
-    filePath: 'config/servercore/config.toml',
-    title: 'Сбалансированная динамика тиков без урезания ближних ферм',
-    note: 'Оставляет адаптивное снижение нагрузки на TPS при перегрузе сервера, не зажимая радиус активации прямо у базы игрока.',
-    content: `[dynamic]
-enabled = true
-target_mspt = 35
-min_chunk_tick_distance = 5
-min_simulation_distance = 6`,
-  },
-  {
-    modId: 'let-me-despawn',
-    modName: 'Let Me Despawn',
-    filePath: 'config/letmedespawn.json',
-    title: 'Защита именных мобов и редких боссов от раннего деспавна с лутом',
-    note: 'По умолчанию мобы с бирками и так защищены; дополнительно можно исключить модовых боссов, чтобы они не пропадали при отходе игрока.',
-    content: `{
-  "despawnTimer": 600,
-  "pickUpItems": true,
-  "mobNames": [
+  "entityWhitelist": [
     "minecraft:ender_dragon",
-    "minecraft:wither"
-  ]
+    "minecraft:wither",
+    "create:contraption",
+    "create:stationary_contraption",
+    "create:gantry_contraption",
+    "create:carriage_contraption"
+  ],
+  "tracingDistance": 128,
+  "sleepDelay": 10,
+  "hitboxLimit": 50
 }`,
+  },
+  {
+    modId: 'more-culling-reforged',
+    modName: 'More Culling Reforged (Совместно с CullLessLeaves и Fast Item Frames)',
+    alsoForModIds: ['culllessleaves-reforged', 'fast-item-frames', 'enhanced-block-entities-reloaded'],
+    filePath: 'config/moreculling.toml',
+    title: 'Отключение дублирующих модулей листвы и рамок при полном стеке куллинга',
+    note: 'Если используете CullLessLeaves Reforged и Fast Item Frames, отключите встроенный куллинг листвы и рамок в More Culling, оставив отсечение скрытых граней блоков и текста табличек.',
+    content: `useBlockStateCulling = true
+useCustomItemFrameRenderer = false
+itemFrameMapCulling = false
+leavesCullingMode = "DEFAULT"
+useOnSignTextCulling = true
+rainDropCulling = true`,
   },
 ];
-

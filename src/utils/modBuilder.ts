@@ -233,10 +233,19 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
   if (effectivePrefs.mode === 'hybrid-server') {
     ids.add('krypton-hybrid');
     ids.add('connectivity');
+    ids.add('chunk-sending');
+    ids.add('smooth-chunk-save');
     ids.add('cupboard');
     ids.add('servercore');
+    ids.add('neruina');
     ids.add('fast-ip-ping');
     ids.add('spark');
+    if (isHeavy || isHeavyPack) {
+      ids.add('structure-essentials');
+      ids.add('better-fps-render-distance');
+      ids.add('too-fast');
+      ids.add('deuf-duplicate-entity-uuid-fix');
+    }
     notes.push('Выбран Krypton Hybrid (сжатие Zstd и фиксы для гибридных серверов Mohist/Arclight) вместо Krypton Reno.');
     excluded.push({ name: 'Krypton Reno', reason: 'Заменён на Krypton Hybrid для совместимости с гибрид-ядром.' });
   } else {
@@ -244,10 +253,19 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
     if (effectivePrefs.mode === 'server') {
       ids.add('servercore');
       ids.add('connectivity');
+      ids.add('chunk-sending');
+      ids.add('smooth-chunk-save');
       ids.add('cupboard');
+      ids.add('neruina');
       ids.add('fast-ip-ping');
       ids.add('spark');
-      notes.push('Для сетевой игры добавлены ServerCore, Connectivity (+ Cupboard), Fast IP Ping и Spark.');
+      if (isHeavy || isHeavyPack) {
+        ids.add('structure-essentials');
+        ids.add('better-fps-render-distance');
+        ids.add('too-fast');
+        ids.add('deuf-duplicate-entity-uuid-fix');
+      }
+      notes.push('Для сетевой игры добавлены ServerCore, Connectivity, Chunk Sending, Smooth Chunk Save (+ Cupboard), Neruina, Fast IP Ping и Spark.');
     } else {
       ids.add('smooth-boot-reloaded');
       notes.push('Для одиночной игры добавлен Smooth Boot (Reloaded) без лишних серверных/сетевых модов.');
@@ -258,6 +276,9 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
     [
       'stutterfix-reforged',
       'threadtweak-reforged',
+      'attributefix',
+      'deuf-duplicate-entity-uuid-fix',
+      'toast-control',
     ].forEach(id => ids.add(id));
   }
 
@@ -268,6 +289,11 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
 
   if (isHeavy) {
     [
+      'saturn',
+      'neruina',
+      'log-begone',
+      'modelfix',
+      'get-it-together-drops',
       'duplicate-nbt-flattener',
       'capability-fix-revived',
       'structure-dfu-cache',
@@ -277,19 +303,12 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
       'stutterfix-reforged',
       'threadtweak-reforged',
       'lightspeedre',
+      'fastsuite',
       'fast-item-frames',
       'immersive-optimization',
       'fast-sounds',
       'soundgc',
     ].forEach(id => ids.add(id));
-    if (recipeViewer === 'none') {
-      ids.add('fastsuite');
-    } else {
-      excluded.push({
-        name: 'FastSuite',
-        reason: 'Несовместим с Fast Recipe Search (при активном JEI/EMI предпочтителен хэш-индекс поиска рецептов).',
-      });
-    }
     if (!isPotato) {
       ids.add('particle-core');
       excluded.push({ name: 'PartiCull', reason: 'Полностью перекрыт Particle Core в максимальной сборке.' });
@@ -298,11 +317,7 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
       excluded.push({ name: 'ServerCore / Connectivity / Cupboard', reason: 'Сетевые моды исключены в одиночном режиме (в соло не дают прироста).' });
     }
     excluded.push({ name: 'RestMode / More Culling / Better Biome Reblend', reason: 'Исключены из-за наложения с Dynamic FPS / CullLessLeaves и архивации Better Biome Reblend.' });
-    notes.push(
-      `Для максимальной сборки добавлены высокоэффективные моды без раздувания миксинов: Kerria, LightStar, Particle Core, ${
-        recipeViewer === 'none' ? 'FastSuite (+ Placebo), ' : ''
-      }Structure DFU (+ RinLib)/Layout, Immersive Optimization, Falling Blocks FPS Fix, StutterFix + ThreadTweak и Fast Item Frames (+ Puzzles Lib).`
-    );
+    notes.push('Для максимальной сборки добавлены высокоэффективные моды без раздувания миксинов: Saturn, Neruina, Log Begone, Kerria, LightStar, Particle Core, FastSuite (+ Placebo), Get It Together, Drops!, Structure DFU/Layout, Immersive Optimization, Falling Blocks FPS Fix, StutterFix + ThreadTweak и Fast Item Frames.');
   } else {
     excluded.push({ name: 'FastSuite / Structure DFU Cache', reason: 'Опциональные кеши для тяжёлых сборок пропущены в лёгком/сбалансированном профиле.' });
   }
@@ -387,6 +402,9 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
   if (effectivePrefs.useCreate) {
     ids.add('flywheel');
     ids.add('vanillin');
+    if (ids.has('oculus')) {
+      ids.add('iris-flywheel-compat');
+    }
     ids.add('immersive-optimization');
     ids.add('alternate-current');
     ids.add('entity-collision-optimization');
@@ -759,83 +777,28 @@ export function smartFixAssembly(selectedIds: string[], prefs?: AssemblyPreferen
     if (focusId === 'restmode') next.delete('dynamic-fps');
     else next.delete('restmode');
   }
-  if (next.has('fast-recipe-search') && next.has('fastsuite')) {
-    if (focusId === 'fastsuite') next.delete('fast-recipe-search');
-    else next.delete('fastsuite');
+  if (next.has('dynamic-fps') && next.has('fps-reducer')) {
+    if (focusId === 'fps-reducer') next.delete('dynamic-fps');
+    else next.delete('fps-reducer');
   }
-  if (next.has('prismanium') && next.has('sodium-embeddium-dynamic-lights')) {
-    if (focusId === 'sodium-embeddium-dynamic-lights') next.delete('prismanium');
+  if (next.has('ryoamiclights') && next.has('sodium-embeddium-dynamic-lights')) {
+    if (focusId === 'sodium-embeddium-dynamic-lights') next.delete('ryoamiclights');
     else next.delete('sodium-embeddium-dynamic-lights');
   }
-  if (next.has('distant-horizons')) {
-    if (next.has('bobby-reforged')) {
-      if (focusId === 'bobby-reforged') next.delete('distant-horizons');
-      else next.delete('bobby-reforged');
-    }
-    if (next.has('farsight')) {
-      if (focusId === 'farsight') next.delete('distant-horizons');
-      else next.delete('farsight');
-    }
+  if (next.has('get-it-together-drops') && next.has('itemmerge')) {
+    if (focusId === 'itemmerge') next.delete('get-it-together-drops');
+    else next.delete('itemmerge');
   }
-  if (next.has('servercore')) {
-    for (const adaptiveId of ['adaptive-performance-tweaks', 'adaptive-optimization-reborn'] as const) {
-      if (next.has(adaptiveId)) {
-        if (focusId === adaptiveId) next.delete('servercore');
-        else next.delete(adaptiveId);
-      }
+  if (next.has('entity-culling') && next.has('itemculler')) {
+    if (focusId !== 'itemculler') next.delete('itemculler');
+  }
+  if (next.has('more-culling-reforged')) {
+    if (focusId === 'more-culling-reforged') {
+      next.delete('fast-item-frames');
+      next.delete('culllessleaves-reforged');
+    } else if (next.has('fast-item-frames')) {
+      next.delete('more-culling-reforged');
     }
-  }
-  if (next.has('mob-collision-off')) {
-    for (const colId of ['farmcollisionless', 'entity-collision-optimization'] as const) {
-      if (next.has(colId)) {
-        if (focusId === colId) next.delete('mob-collision-off');
-        else next.delete(colId);
-      }
-    }
-  }
-  if (next.has('particle-core') && next.has('asyncparticles')) {
-    if (focusId === 'asyncparticles') next.delete('particle-core');
-    else next.delete('asyncparticles');
-  }
-  if (next.has('immersive-optimization')) {
-    for (const sleepId of ['entitysleep', 'enttick', 'sleepium', 'martensite-entity-tick-skiper'] as const) {
-      if (next.has(sleepId)) {
-        if (focusId === sleepId) next.delete('immersive-optimization');
-        else next.delete(sleepId);
-      }
-    }
-  }
-  const hasC2meInNext =
-    next.has('concurrent-chunk-management-engine-forge-c2me') ||
-    next.has('c2me-concurrent-chunk-management-engine') ||
-    next.has('c2mer');
-  if (hasC2meInNext) {
-    for (const saveId of ['parallel-world-save', 'delta-chunk'] as const) {
-      if (next.has(saveId)) {
-        if (focusId === saveId) {
-          next.delete('concurrent-chunk-management-engine-forge-c2me');
-          next.delete('c2me-concurrent-chunk-management-engine');
-          next.delete('c2mer');
-        } else {
-          next.delete(saveId);
-        }
-      }
-    }
-  }
-  if (next.has('parallel-world-save') && next.has('delta-chunk')) {
-    if (focusId === 'delta-chunk') next.delete('parallel-world-save');
-    else next.delete('delta-chunk');
-  }
-  if (next.has('resourcepackcached')) {
-    for (const rpId of ['keep-the-resourcepack', 'packforge'] as const) {
-      if (next.has(rpId)) {
-        if (focusId === rpId) next.delete('resourcepackcached');
-        else next.delete(rpId);
-      }
-    }
-  } else if (next.has('keep-the-resourcepack') && next.has('packforge')) {
-    if (focusId === 'packforge') next.delete('keep-the-resourcepack');
-    else next.delete('packforge');
   }
 
   for (const id of Array.from(next)) {
@@ -939,11 +902,9 @@ export function smartFixAssembly(selectedIds: string[], prefs?: AssemblyPreferen
     ['fzzy-config', LIBRARY_CONSUMER_MAP['fzzy-config']],
     ['resourceful-config', LIBRARY_CONSUMER_MAP['resourceful-config']],
     ['sodium-embeddium-options-api', LIBRARY_CONSUMER_MAP['sodium-embeddium-options-api']],
-    ['puzzles-lib', LIBRARY_CONSUMER_MAP['puzzles-lib']],
-    ['almanac', LIBRARY_CONSUMER_MAP['almanac']],
     ['placebo', LIBRARY_CONSUMER_MAP['placebo']],
+    ['obsidianui', LIBRARY_CONSUMER_MAP['obsidianui']],
     ['architectury-api', LIBRARY_CONSUMER_MAP['architectury-api']],
-    ['rinlib', LIBRARY_CONSUMER_MAP['rinlib']],
     ['accelerated-recoiling', ['accelerated-rendering', 'accelerated-rendering-turned']],
   ];
   for (const [libId, consumers] of strictSinglePurposeLibs) {
@@ -1021,15 +982,14 @@ export function toggleModSmart(
       ['fzzy-config', LIBRARY_CONSUMER_MAP['fzzy-config']],
       ['resourceful-config', LIBRARY_CONSUMER_MAP['resourceful-config']],
       ['sodium-embeddium-options-api', LIBRARY_CONSUMER_MAP['sodium-embeddium-options-api']],
-      ['puzzles-lib', LIBRARY_CONSUMER_MAP['puzzles-lib']],
-      ['almanac', LIBRARY_CONSUMER_MAP['almanac']],
       ['placebo', LIBRARY_CONSUMER_MAP['placebo']],
+      ['obsidianui', LIBRARY_CONSUMER_MAP['obsidianui']],
       ['architectury-api', LIBRARY_CONSUMER_MAP['architectury-api']],
-      ['rinlib', LIBRARY_CONSUMER_MAP['rinlib']],
     ];
     for (const [libId, consumers] of singlePurposeLibs) {
       if (next.has(libId) && consumers.some(c => removedIdSet.has(c)) && !consumers.some(c => next.has(c))) {
         next.delete(libId);
+        removedIdSet.add(libId);
         removedDependents.push(MOD_BY_ID.get(libId)?.name || libId);
       }
     }
@@ -1205,15 +1165,14 @@ export function toggleModSmart(
       ['fzzy-config', LIBRARY_CONSUMER_MAP['fzzy-config']],
       ['resourceful-config', LIBRARY_CONSUMER_MAP['resourceful-config']],
       ['sodium-embeddium-options-api', LIBRARY_CONSUMER_MAP['sodium-embeddium-options-api']],
-      ['puzzles-lib', LIBRARY_CONSUMER_MAP['puzzles-lib']],
-      ['almanac', LIBRARY_CONSUMER_MAP['almanac']],
       ['placebo', LIBRARY_CONSUMER_MAP['placebo']],
+      ['obsidianui', LIBRARY_CONSUMER_MAP['obsidianui']],
       ['architectury-api', LIBRARY_CONSUMER_MAP['architectury-api']],
-      ['rinlib', LIBRARY_CONSUMER_MAP['rinlib']],
     ];
     for (const [libId, consumers] of singlePurposeLibs) {
       if (libId !== modId && next.has(libId) && consumers.some(c => evictedIds.has(c)) && !consumers.some(c => next.has(c))) {
         next.delete(libId);
+        evictedIds.add(libId);
         removedNames.push(MOD_BY_ID.get(libId)?.name || libId);
       }
     }
@@ -1278,15 +1237,14 @@ export function removeModsCascade(currentIds: string[], removeIds: string[]): { 
     ['fzzy-config', LIBRARY_CONSUMER_MAP['fzzy-config']],
     ['resourceful-config', LIBRARY_CONSUMER_MAP['resourceful-config']],
     ['sodium-embeddium-options-api', LIBRARY_CONSUMER_MAP['sodium-embeddium-options-api']],
-    ['puzzles-lib', LIBRARY_CONSUMER_MAP['puzzles-lib']],
-    ['almanac', LIBRARY_CONSUMER_MAP['almanac']],
     ['placebo', LIBRARY_CONSUMER_MAP['placebo']],
+    ['obsidianui', LIBRARY_CONSUMER_MAP['obsidianui']],
     ['architectury-api', LIBRARY_CONSUMER_MAP['architectury-api']],
-    ['rinlib', LIBRARY_CONSUMER_MAP['rinlib']],
   ];
   for (const [libId, consumers] of singlePurposeLibs) {
     if (next.has(libId) && consumers.some(c => removedIdSet.has(c)) && !consumers.some(c => next.has(c))) {
       next.delete(libId);
+      removedIdSet.add(libId);
       cascadedNames.push(MOD_BY_ID.get(libId)?.name || libId);
     }
   }

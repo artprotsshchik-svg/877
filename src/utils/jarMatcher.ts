@@ -4,7 +4,7 @@ function normalizeJarToken(raw: string): string {
   return raw
     .toLowerCase()
     .replace(/\.jar(\.disabled)?$/i, '')
-    .replace(/[-_+ ]mc?1\.\d+(\.\d+)?/gi, '')
+    .replace(/[-_+ ]?(mc)?1\.\d+(\.\d+)?/gi, '')
     .replace(/[-_+ ](forge|neoforge|fabric|quilt|universal|hd[-_]?u)[-_+ ].*$/gi, '')
     .replace(/[-_+](forge|neoforge|fabric|quilt|universal)\b/gi, '')
     .replace(/[-_+ ]v?\d+\.\d+.*$/i, '')
@@ -114,17 +114,35 @@ const JAR_ALIASES: Record<string, string> = {
   optifine: 'optifine',
   rubidium: 'rubidium',
   xenon: 'xenon',
-  puzzleslib: 'puzzles-lib',
-  almanac: 'almanac',
-  almanaclib: 'almanac',
+  irisflywheelcompat: 'iris-flywheel-compat',
+  oculusflywheelcompat: 'iris-flywheel-compat',
+  ryoamiclights: 'ryoamiclights',
+  modelfix: 'modelfix',
+  modelgapfix: 'modelfix',
+  textruesembeddiumoptions: 'textrues-embeddium-options',
+  fpsreducer: 'fps-reducer',
+  betterfpsdist: 'better-fps-render-distance',
+  betterfpsrenderdistance: 'better-fps-render-distance',
+  saturn: 'saturn',
+  neruina: 'neruina',
+  notenoughcrashes: 'not-enough-crashes',
+  crashutilities: 'crash-utilities',
+  logbegone: 'log-begone',
+  smoothchunk: 'smooth-chunk-save',
+  smoothchunksave: 'smooth-chunk-save',
+  chunksending: 'chunk-sending',
+  structureessentials: 'structure-essentials',
+  toofast: 'too-fast',
+  getittogetherdrops: 'get-it-together-drops',
+  toastcontrol: 'toast-control',
+  attributefix: 'attributefix',
+  deuf: 'deuf-duplicate-entity-uuid-fix',
+  netherportalfix: 'netherportalfix',
+  recipeessentials: 'recipe-essentials',
   placebo: 'placebo',
   architectury: 'architectury-api',
   architecturyapi: 'architectury-api',
-  rinlib: 'rinlib',
-  papi: 'put-a-plug-in-it-papi',
-  putapluginit: 'put-a-plug-in-it-papi',
-  fallingblocksfpsfix: 'falling-blocks-fps-fix',
-  structuredfucache: 'structure-dfu-cache',
+  obsidianui: 'obsidianui',
 };
 
 const MOD_TOKEN_INDEX = (() => {
