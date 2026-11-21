@@ -29,15 +29,7 @@ import { AssemblyBuilderTab } from './components/AssemblyBuilderTab.tsx';
 import { CatalogTab } from './components/CatalogTab.tsx';
 import { PresetsTab } from './components/PresetsTab.tsx';
 import { ConfigsTab } from './components/ConfigsTab.tsx';
-import { Check, Download, Link2, Redo2, Undo2 } from 'lucide-react';
-import {
-  DESKTOP_EXE_DOWNLOAD_URL,
-  DESKTOP_EXE_FILENAME,
-  DESKTOP_EXE_META_URL,
-  formatExeSizeMb,
-  shouldShowExeDownload,
-  type ExeArtifactMeta,
-} from './utils/desktopDownload.ts';
+import { Redo2, Undo2 } from 'lucide-react';
 
 const DEFAULT_CHECKED_MOD_IDS: string[] = [
   'embeddium',
@@ -51,25 +43,23 @@ const DEFAULT_CHECKED_MOD_IDS: string[] = [
   'matlib',
   'culllessleaves-reforged',
   'fast-item-frames',
+  'puzzles-lib',
   'modernfix',
   'ferritecore',
-  'saturn',
   'alltheleaks-memory-leak-fix',
   'jasione',
   'put-a-plug-in-it-papi',
   'radium-re-reforged',
   'badoptimizations',
-  'neruina',
   'noisiumed',
   'solix',
   'falling-blocks-fps-fix',
-  'modelfix',
   'ixeris',
   'smooth-boot-reloaded',
   'dynamic-fps',
   'clumps',
-  'get-it-together-drops',
   'let-me-despawn',
+  'almanac',
   'packet-fixer',
   'krypton-reno',
   'reload-looping-sound-fix',
@@ -105,9 +95,6 @@ export default function App() {
   const [lastSavedDate, setLastSavedDate] = useState<string>(
     initialLocal?.lastSavedDate ?? initialLocal?.dbUpdatedAt ?? DATABASE_UPDATED_AT
   );
-  const [shareCopied, setShareCopied] = useState(false);
-  const [exeMeta, setExeMeta] = useState<ExeArtifactMeta | null>(null);
-  const isDesktopApp = typeof window !== 'undefined' && Boolean(window.desktopAPI?.isDesktop);
 
   // Undo / Redo history (C4)
   const pastRef = useRef<HistorySnapshot[]>([]);
@@ -257,22 +244,6 @@ export default function App() {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (!shouldShowExeDownload(isDesktopApp)) return;
-    let cancelled = false;
-    fetch(DESKTOP_EXE_META_URL, { cache: 'no-store' })
-      .then(res => (res.ok ? res.json() : null))
-      .then((data: ExeArtifactMeta | null) => {
-        if (!cancelled && data && typeof data.sizeBytes === 'number') {
-          setExeMeta(data);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [isDesktopApp]);
 
   useEffect(() => {
     if (!hydratedRef.current) return;
@@ -432,20 +403,6 @@ export default function App() {
     setActiveTab('assembler');
   };
 
-  const handleCopyShareLink = () => {
-    const shareHash = encodeShareHash({
-      activeTab,
-      builderModIds,
-      checkedModIds,
-      builderPrefs,
-    });
-    const url = `${window.location.origin}${window.location.pathname}${shareHash}`;
-    window.history.replaceState(null, '', shareHash);
-    navigator.clipboard?.writeText?.(url)?.catch(() => {});
-    setShareCopied(true);
-    setTimeout(() => setShareCopied(false), 1800);
-  };
-
   const navItems: Array<{
     id: PersistedTabKey;
     label: string;
@@ -514,32 +471,6 @@ export default function App() {
             >
               <Redo2 className="w-3.5 h-3.5" />
             </button>
-            <button
-              type="button"
-              onClick={handleCopyShareLink}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-[4px] bg-[#121417] hover:bg-[#22262b] border border-[#2a2e33] text-[11px] font-medium text-[#e6e8ea] transition-colors duration-150 whitespace-nowrap"
-              title="Скопировать ссылку с состоянием сборки (#hash)"
-            >
-              {shareCopied ? <Check className="w-3 h-3 text-[#3ddc84]" /> : <Link2 className="w-3 h-3 text-[#8b9199]" />}
-              <span className="hidden sm:inline">{shareCopied ? 'Скопировано' : 'Ссылка'}</span>
-            </button>
-            {shouldShowExeDownload(isDesktopApp) && (
-              <a
-                href={DESKTOP_EXE_DOWNLOAD_URL}
-                download={exeMeta?.filename ?? DESKTOP_EXE_FILENAME}
-                data-download-exe="true"
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-[4px] bg-[#121417] hover:bg-[#22262b] border border-[#3ddc84]/50 hover:border-[#3ddc84] text-[11px] font-semibold text-[#e6e8ea] transition-colors duration-150 whitespace-nowrap"
-                title={`Скачать автономный .exe для Windows x64${exeMeta ? ` (${formatExeSizeMb(exeMeta.sizeBytes)})` : ''}`}
-              >
-                <Download className="w-3 h-3 text-[#3ddc84]" aria-hidden="true" />
-                <span>.exe</span>
-                {exeMeta && (
-                  <span className="hidden lg:inline font-mono text-[10px] text-[#8b9199] tabular-nums">
-                    {formatExeSizeMb(exeMeta.sizeBytes)}
-                  </span>
-                )}
-              </a>
-            )}
             <span className="hidden xl:inline text-[11px] font-mono tabular-nums text-[#8b9199] pl-1 whitespace-nowrap">
               Forge 1.20.1
             </span>
@@ -595,6 +526,9 @@ export default function App() {
             builderSet={builderSet}
             onToggleBuilderMod={toggleBuilderMod}
             builderPrefs={builderPrefs}
+            onToggleHideOutdatedUseless={() =>
+              setBuilderPrefs(p => ({ ...p, hideOutdatedUseless: p.hideOutdatedUseless === false }))
+            }
             onOpenDetail={setSelectedModDetail}
           />
         )}

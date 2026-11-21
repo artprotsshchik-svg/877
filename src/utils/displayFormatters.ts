@@ -25,7 +25,7 @@ export function cleanModDescription(description: string): string {
     .replace(/\s*\([^)]*(?:\b(?:CF|MR|CurseForge|Modrinth)\b|\d+(?:\.\d+)?[kKmM]\+|скачиван|обновлен|\b\d{2}\.\d{4}\b|\b202\d\b)[^)]*\)/gi, '')
     .replace(/\bна\s+(?:CurseForge|Modrinth|CF|MR)\b/gi, '')
     .replace(/\s*\(\s*\)/g, '')
-    .replace(/\s+([.,;:])/g, '$1')
+    .replace(/\s+([.,;:])(?![a-zA-Z0-9_])/g, '$1')
     .replace(/\s{2,}/g, ' ')
     .trim();
   return out;

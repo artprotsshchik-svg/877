@@ -21,9 +21,7 @@ export function ConfigsTab({ activeModIds, onOpenDetail }: ConfigsTabProps) {
   const visibleConfigs = useMemo(() => {
     const q = search.trim().toLowerCase();
     return MOD_RECOMMENDED_CONFIGS.filter(entry => {
-      const isEntryActive =
-        activeSet.has(entry.modId) || Boolean(entry.alsoForModIds?.some(id => activeSet.has(id)));
-      if (scope === 'active' && !isEntryActive) return false;
+      if (scope === 'active' && !activeSet.has(entry.modId)) return false;
       if (!q) return true;
       return (
         entry.modName.toLowerCase().includes(q) ||
@@ -132,16 +130,15 @@ export function ConfigsTab({ activeModIds, onOpenDetail }: ConfigsTabProps) {
         <div className="space-y-3">
           {visibleConfigs.map(cfg => {
             const mod = MOD_BY_ID.get(cfg.modId);
-            const isActive =
-              activeSet.has(cfg.modId) || Boolean(cfg.alsoForModIds?.some(id => activeSet.has(id)));
+            const isActive = activeSet.has(cfg.modId);
             const key = `${cfg.modId}:${cfg.filePath}`;
             return (
               <div
                 key={key}
                 className="bg-[#1a1d21] border border-[#2a2e33] rounded-[6px] p-4 space-y-2.5"
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
                     <div className="flex flex-wrap items-baseline gap-2">
                       {mod ? (
                         <button

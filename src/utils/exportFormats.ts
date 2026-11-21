@@ -1,5 +1,6 @@
 import { MODS_DATABASE, type ModItem } from '../data/modsData.ts';
 import type { AssemblyImpactSummary, AssemblyPreferences } from './modTypes.ts';
+import type { HonestFpsEstimate } from './fpsEstimator.ts';
 import { cleanStatusLabel } from './displayFormatters.ts';
 import { evaluateModImpactInPack, organizeAssemblyTree } from './modLogic.ts';
 
@@ -39,12 +40,15 @@ function getOrderedMods(selectedIds: string[]): ModItem[] {
 
 export function exportAssemblyAsTxt(
   selectedIds: string[],
-  summary: AssemblyImpactSummary
+  summary: AssemblyImpactSummary,
+  fpsEstimate: HonestFpsEstimate
 ): string {
   const mods = getOrderedMods(selectedIds);
   const lines: string[] = [
     'Mod Optimizer — Сборка Forge 1.20.1',
-    `Оценка сборки: ${summary.assemblyScore}/100 (Эффективность: ${summary.scoreBreakdown.efficiencyScore}, Стабильность: ${summary.scoreBreakdown.stabilityScore}, Чистота: ${summary.scoreBreakdown.cleanlinessScore}, Визуал: ${summary.scoreBreakdown.visualSafetyScore})`,
+    `Оценка сборки: ${summary.assemblyScore}/100`,
+    `Прогноз FPS: ${fpsEstimate.label}`,
+    `Экономия ОЗУ: ${summary.resourceBalance.ramDeltaLabel}`,
     `Модов: ${mods.length}`,
     '',
     'Список модов:',
@@ -85,6 +89,44 @@ export function exportAssemblyAsCsv(
     ].join(',');
   });
   return '\uFEFF' + [header.join(','), ...rows].join('\n');
+}
+
+export function exportAssemblyAsJson(
+  selectedIds: string[],
+  summary: AssemblyImpactSummary,
+  fpsEstimate: HonestFpsEstimate,
+  prefs?: AssemblyPreferences
+): string {
+  const mods = getOrderedMods(selectedIds);
+  const selectedSet = new Set(selectedIds);
+  const payload = {
+    schemaVersion: 1,
+    minecraftVersion: '1.20.1',
+    loader: 'forge',
+    exportedAt: new Date().toISOString(),
+    assemblyScore: summary.assemblyScore,
+    fpsEstimate: {
+      minPct: fpsEstimate.minPct,
+      maxPct: fpsEstimate.maxPct,
+      label: fpsEstimate.label,
+    },
+    scoreBreakdown: summary.scoreBreakdown,
+    preferences: prefs ?? null,
+    mods: mods.map(mod => {
+      const impact = evaluateModImpactInPack(mod, selectedSet, undefined, prefs);
+      return {
+        id: mod.id,
+        name: mod.name,
+        category: mod.category,
+        groupId: mod.groupId || null,
+        platform: mod.platform,
+        status: cleanStatusLabel(mod.statusLabel),
+        impactPoints: impact.impactPoints,
+        curseforgeUrl: mod.curseforgeUrl,
+      };
+    }),
+  };
+  return JSON.stringify(payload, null, 2);
 }
 
 export function triggerFileDownload(filename: string, content: string, mimeType: string): void {

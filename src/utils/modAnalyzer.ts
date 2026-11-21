@@ -125,10 +125,19 @@ export const EXCLUSIVE_ENGINE_POOLS: Record<string, string[]> = {
     'clearlagg-server-forge',
     'customizable-entity-clear',
   ],
-  'mob-despawn': ['let-me-despawn', 'despawntweaker'],
+  'mob-despawn': ['let-me-despawn', 'despawntweaker', 'despawn-tweaks', 'despawn-tweaks-modern-port'],
   'weather-disable': ['no-rain', 'disable-rain'],
   'potion-particles': ['no-more-potion-particles', 'noeffectparticles'],
   'damage-particles': ['limited-damage-indicator-particle', 'no-damage-indicator-heart-particles'],
+  'stutterfix-ports': ['stutterfix-reforged', 'stutterfix-modern-port'],
+  'language-reload': ['language-reload-reforged', 'languagereloadunofficial'],
+  'capability-fix': ['capability-fix-revived', 'capability-fix'],
+  'client-chunk-cache': ['bobby-reforged', 'farsight'],
+  'furnace-cache': ['fastfurnace', 'furnaceoptimizer'],
+  'explosion-optimizers': ['better-tnt', 'perfomant-boom'],
+  'f3-debug-screen': ['compact-f3-plus', 'improved-f3'],
+  'splash-screen-hooks': ['smooth-loading-screens', 'early-loading-screen', 'splashscreen'],
+  'entity-tick-sleep': ['entitysleep', 'enttick', 'sleepium', 'martensite-entity-tick-skiper'],
 };
 
 export const MOD_HARD_DEPENDENCIES: Record<string, string[]> = {
@@ -156,38 +165,33 @@ export const MOD_HARD_DEPENDENCIES: Record<string, string[]> = {
   'connector-extras': ['sinytra-connector'],
   'particle-core': ['kotlin-for-forge', 'fzzy-config'],
   'fzzy-config': ['kotlin-for-forge'],
-  'observable': ['kotlin-for-forge'],
   'lazyyyyy': ['forgified-fabric-api', 'kotlin-for-forge'],
+  'geckolib-animation-optimizer': ['geckolib'],
   'geckolibbetterfps': ['geckolib', 'embeddium'],
   'structure-layout-optimizer': ['resourceful-config'],
+  'structure-dfu-cache': ['rinlib'],
   'chunkyborder': ['chunky'],
   'ggtu': ['embeddium', 'oculus'],
   'enhanced-block-entities-reloaded': ['matlib'],
+  'fast-item-frames': ['puzzles-lib'],
+  'let-me-despawn': ['almanac'],
+  'observable': ['kotlin-for-forge', 'architectury-api'],
   'connectivity': ['cupboard'],
+  'fastsuite': ['placebo'],
+  'fastfurnace': ['placebo'],
+  'fastworkbench': ['placebo'],
   'fastali': ['advanced-loot-info-ali'],
   'tmrv-updated': ['emi'],
   'emi-loot': ['emi', 'fzzy-config'],
   'emi-ores': ['emi'],
-  'emiffect': ['emi'],
+  'emiffect': ['emi', 'fzzy-config'],
   'emi-trades': ['emi'],
   'emi-professions': ['emi'],
   'jeioptimizer': ['just-enough-items-jei'],
   'just-enough-freezes': ['just-enough-items-jei'],
   'just-enough-threads': ['just-enough-items-jei'],
   'jeir-jei-rewired': ['just-enough-items-jei'],
-  'iris-flywheel-compat': ['oculus', 'flywheel'],
-  'ryoamiclights': ['obsidianui', 'architectury-api'],
-  'obsidianui': ['architectury-api'],
-  'textrues-embeddium-options': ['embeddium'],
-  'better-fps-render-distance': ['cupboard'],
-  'smooth-chunk-save': ['cupboard'],
-  'chunk-sending': ['cupboard'],
-  'structure-essentials': ['cupboard'],
-  'recipe-essentials': ['cupboard'],
-  'fastsuite': ['placebo'],
-  'fastfurnace': ['placebo'],
-  'fastworkbench': ['placebo'],
-  'toast-control': ['placebo'],
+  'controlling': ['searchables'],
 };
 
 export const MOD_ALTERNATIVE_DEPENDENCIES: Record<string, string[][]> = {
@@ -218,9 +222,14 @@ const PURE_LIBRARY_MOD_IDS = new Set([
   'resourceful-config',
   'sodium-embeddium-options-api',
   'geckolib',
+  'puzzles-lib',
+  'almanac',
   'placebo',
   'architectury-api',
-  'obsidianui',
+  'rinlib',
+  'configured',
+  'controlling',
+  'searchables',
 ]);
 
 export function findModByDisplayName(name: string): ModItem | undefined {
@@ -426,21 +435,25 @@ export function getExclusivePoolForMod(modId: string): { groupId: string; poolId
   return null;
 }
 
+const RULE_CONFLICT_CACHE = new Map<string, string[]>();
+
 export function getRuleConflictingIds(modId: string): string[] {
+  const cached = RULE_CONFLICT_CACHE.get(modId);
+  if (cached) return cached;
+
   const mod = MOD_BY_ID.get(modId);
   if (!mod) return [];
-  const slug = normalizeSlug(mod.name);
+  const slug = MOD_SLUG_BY_ID.get(modId) ?? normalizeSlug(mod.name);
   const conflicts = new Set<string>();
 
-  for (const rule of INCOMPATIBILITY_RULES) {
-    const ruleSlugs = rule.conflictingMods.map(normalizeSlug);
-    if (!ruleSlugs.includes(slug)) continue;
+  for (const { rule, slugSet } of PRECOMPUTED_RULES) {
+    if (!slugSet.has(slug)) continue;
 
     if (rule.title.includes('OptiFine')) {
       for (const m of MODS_DATABASE) {
-        const ms = normalizeSlug(m.name);
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
         if (slug === 'optifine') {
-          if (ms !== 'optifine' && ruleSlugs.includes(ms)) conflicts.add(m.id);
+          if (ms !== 'optifine' && slugSet.has(ms)) conflicts.add(m.id);
         } else if (ms === 'optifine') {
           conflicts.add(m.id);
         }
@@ -450,9 +463,9 @@ export function getRuleConflictingIds(modId: string): string[] {
 
     if (rule.title.includes('Nvidium и шейдеров')) {
       for (const m of MODS_DATABASE) {
-        const ms = normalizeSlug(m.name);
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
         if (NVIDIUM_FAMILY_IDS.has(mod.id)) {
-          if (!NVIDIUM_FAMILY_IDS.has(m.id) && ruleSlugs.includes(ms)) conflicts.add(m.id);
+          if (!NVIDIUM_FAMILY_IDS.has(m.id) && slugSet.has(ms)) conflicts.add(m.id);
         } else if (NVIDIUM_FAMILY_IDS.has(m.id)) {
           conflicts.add(m.id);
         }
@@ -462,8 +475,8 @@ export function getRuleConflictingIds(modId: string): string[] {
 
     if (rule.title.includes('Nvidium ↔ Alloyium')) {
       for (const m of MODS_DATABASE) {
-        const ms = normalizeSlug(m.name);
-        if (m.id === modId || !ruleSlugs.includes(ms)) continue;
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
+        if (m.id === modId || !slugSet.has(ms)) continue;
         if (NVIDIUM_FAMILY_IDS.has(mod.id) && NVIDIUM_FAMILY_IDS.has(m.id)) continue;
         conflicts.add(m.id);
       }
@@ -472,9 +485,9 @@ export function getRuleConflictingIds(modId: string): string[] {
 
     if (rule.title.includes('Emberbium с аддонами Embeddium')) {
       for (const m of MODS_DATABASE) {
-        const ms = normalizeSlug(m.name);
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
         if (mod.id === 'emberbium') {
-          if (m.id !== 'emberbium' && ruleSlugs.includes(ms)) conflicts.add(m.id);
+          if (m.id !== 'emberbium' && slugSet.has(ms)) conflicts.add(m.id);
         } else if (m.id === 'emberbium') {
           conflicts.add(m.id);
         }
@@ -484,9 +497,9 @@ export function getRuleConflictingIds(modId: string): string[] {
 
     if (rule.title.includes('Acedium/Revidium с шейдерами')) {
       for (const m of MODS_DATABASE) {
-        const ms = normalizeSlug(m.name);
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
         if (mod.id === 'revidium-accedium') {
-          if (m.id !== 'revidium-accedium' && ruleSlugs.includes(ms)) conflicts.add(m.id);
+          if (m.id !== 'revidium-accedium' && slugSet.has(ms)) conflicts.add(m.id);
         } else if (m.id === 'revidium-accedium') {
           conflicts.add(m.id);
         }
@@ -496,9 +509,9 @@ export function getRuleConflictingIds(modId: string): string[] {
 
     if (rule.title.includes('Xenon с аддонами Embeddium')) {
       for (const m of MODS_DATABASE) {
-        const ms = normalizeSlug(m.name);
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
         if (mod.id === 'xenon') {
-          if (m.id !== 'xenon' && ruleSlugs.includes(ms)) conflicts.add(m.id);
+          if (m.id !== 'xenon' && slugSet.has(ms)) conflicts.add(m.id);
         } else if (m.id === 'xenon') {
           conflicts.add(m.id);
         }
@@ -506,8 +519,32 @@ export function getRuleConflictingIds(modId: string): string[] {
       continue;
     }
 
+    if (rule.title.includes('Dimensional Threading')) {
+      for (const m of MODS_DATABASE) {
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
+        if (mod.id === 'dimensional-threading-reforked') {
+          if (m.id !== 'dimensional-threading-reforked' && slugSet.has(ms)) conflicts.add(m.id);
+        } else if (m.id === 'dimensional-threading-reforked') {
+          conflicts.add(m.id);
+        }
+      }
+      continue;
+    }
+
+    if (rule.title.includes('Zstd-сжатия')) {
+      for (const m of MODS_DATABASE) {
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
+        if (mod.id === 'zstdnet') {
+          if (m.id !== 'zstdnet' && slugSet.has(ms)) conflicts.add(m.id);
+        } else if (m.id === 'zstdnet') {
+          conflicts.add(m.id);
+        }
+      }
+      continue;
+    }
+
     for (const m of MODS_DATABASE) {
-      if (m.id !== modId && ruleSlugs.includes(normalizeSlug(m.name))) {
+      if (m.id !== modId && slugSet.has(MOD_SLUG_BY_ID.get(m.id) || '')) {
         conflicts.add(m.id);
       }
     }
@@ -520,7 +557,9 @@ export function getRuleConflictingIds(modId: string): string[] {
     }
   }
 
-  return Array.from(conflicts);
+  const result = Array.from(conflicts);
+  RULE_CONFLICT_CACHE.set(modId, result);
+  return result;
 }
 
 export function analyzeSelection(selectedIds: string[]) {
@@ -626,6 +665,42 @@ export function analyzeSelection(selectedIds: string[]) {
       );
       if (others.length > 0) {
         const matched = [xenon, ...others];
+        matched.forEach(m => conflictingIdSet.add(m.id));
+        conflicts.push({
+          rule,
+          matchedIds: matched.map(m => m.id),
+          matchedNames: matched.map(m => m.name),
+        });
+      }
+      continue;
+    }
+
+    if (rule.title.includes('Dimensional Threading')) {
+      const dimThread = selectedMods.find(m => m.id === 'dimensional-threading-reforked');
+      if (!dimThread) continue;
+      const others = selectedMods.filter(
+        m => m.id !== 'dimensional-threading-reforked' && slugSet.has(MOD_SLUG_BY_ID.get(m.id) || '')
+      );
+      if (others.length > 0) {
+        const matched = [dimThread, ...others];
+        matched.forEach(m => conflictingIdSet.add(m.id));
+        conflicts.push({
+          rule,
+          matchedIds: matched.map(m => m.id),
+          matchedNames: matched.map(m => m.name),
+        });
+      }
+      continue;
+    }
+
+    if (rule.title.includes('Zstd-сжатия')) {
+      const zstd = selectedMods.find(m => m.id === 'zstdnet');
+      if (!zstd) continue;
+      const others = selectedMods.filter(
+        m => m.id !== 'zstdnet' && slugSet.has(MOD_SLUG_BY_ID.get(m.id) || '')
+      );
+      if (others.length > 0) {
+        const matched = [zstd, ...others];
         matched.forEach(m => conflictingIdSet.add(m.id));
         conflicts.push({
           rule,
@@ -794,33 +869,6 @@ export function analyzeSelection(selectedIds: string[]) {
     });
   }
 
-  if (selectedSet.has('dynamic-fps') && selectedSet.has('fps-reducer')) {
-    warnings.push({
-      modId: 'fps-reducer',
-      modName: 'FPS Reducer',
-      severity: 'yellow',
-      message: 'Пересечение фонового лимитера: Dynamic FPS уже сбрасывает FPS и громкость при сворачивании/простое — оставьте один мод.',
-    });
-  }
-
-  if (selectedSet.has('ryoamiclights') && selectedSet.has('sodium-embeddium-dynamic-lights')) {
-    warnings.push({
-      modId: 'sodium-embeddium-dynamic-lights',
-      modName: 'Sodium/Embeddium Dynamic Lights',
-      severity: 'yellow',
-      message: 'Дубль динамического освещения: RyoamicLights и Sodium/Embeddium Dynamic Lights выполняют одну задачу — оставьте один мод.',
-    });
-  }
-
-  if (selectedSet.has('get-it-together-drops') && selectedSet.has('itemmerge')) {
-    warnings.push({
-      modId: 'itemmerge',
-      modName: 'ItemMerge',
-      severity: 'yellow',
-      message: 'Дубль объединения дропа: Get It Together, Drops! современнее и полностью перекрывает ItemMerge — оставьте один.',
-    });
-  }
-
   if (selectedSet.has('tritium')) {
     const chestMods = [
       'enhanced-block-entities-reloaded',
@@ -839,25 +887,6 @@ export function analyzeSelection(selectedIds: string[]) {
         modName: 'Tritium',
         severity: 'yellow',
         message: `Tritium частично дублирует модули (${overlapLabels.join(', ')}) — отключите пересекающиеся функции в конфиге Tritium.`,
-      });
-    }
-  }
-
-  if (selectedSet.has('clab')) {
-    const leafMods = [
-      'culllessleaves-reforged',
-      'leaves-culling',
-      'sodium-leaf-culling-unofficial',
-      'sodium-embeddium-leaf-culling',
-      'more-culling-reforged',
-    ].filter(id => selectedSet.has(id));
-    if (leafMods.length > 0) {
-      const names = leafMods.map(id => MOD_BY_ID.get(id)?.name || id);
-      warnings.push({
-        modId: 'clab',
-        modName: 'CLab',
-        severity: 'yellow',
-        message: `CLab уже содержит встроенный куллинг листвы и пересекается с ${names.join(', ')} — отключите куллинг листвы в одном из модов.`,
       });
     }
   }
@@ -934,6 +963,127 @@ export function analyzeSelection(selectedIds: string[]) {
     });
   }
 
+  if (selectedSet.has('prismanium') && selectedSet.has('sodium-embeddium-dynamic-lights')) {
+    warnings.push({
+      modId: 'sodium-embeddium-dynamic-lights',
+      modName: 'Sodium/Embeddium Dynamic Lights',
+      severity: 'yellow',
+      message: 'Prismanium уже содержит встроенное динамическое освещение — отдельный Sodium/Embeddium Dynamic Lights дублирует его.',
+    });
+  }
+
+  if (selectedSet.has('distant-horizons')) {
+    for (const cacheId of ['bobby-reforged', 'farsight'] as const) {
+      if (selectedSet.has(cacheId)) {
+        const cacheName = MOD_BY_ID.get(cacheId)?.name || cacheId;
+        warnings.push({
+          modId: cacheId,
+          modName: cacheName,
+          severity: 'yellow',
+          message: `Distant Horizons полностью заменяет клиентский кэш чанков ${cacheName} более лёгким LOD-конвейером.`,
+        });
+      }
+    }
+  }
+
+  if (selectedSet.has('servercore')) {
+    for (const adaptiveId of ['adaptive-performance-tweaks', 'adaptive-optimization-reborn'] as const) {
+      if (selectedSet.has(adaptiveId)) {
+        const adaptiveName = MOD_BY_ID.get(adaptiveId)?.name || adaptiveId;
+        warnings.push({
+          modId: adaptiveId,
+          modName: adaptiveName,
+          severity: 'yellow',
+          message: `Пересечение адаптивных контроллеров TPS: ServerCore и ${adaptiveName} одновременно регулируют ИИ мобов и дальность — оставьте один ServerCore.`,
+        });
+      }
+    }
+  }
+
+  if (selectedSet.has('mob-collision-off')) {
+    for (const colId of ['farmcollisionless', 'entity-collision-optimization'] as const) {
+      if (selectedSet.has(colId)) {
+        const colName = MOD_BY_ID.get(colId)?.name || colId;
+        warnings.push({
+          modId: colId,
+          modName: colName,
+          severity: 'yellow',
+          message: `Mob Collision Off уже полностью отключает коллизии мобов — ${colName} в этой паре избыточен.`,
+        });
+      }
+    }
+  }
+
+  if (selectedSet.has('particle-core') && selectedSet.has('asyncparticles')) {
+    warnings.push({
+      modId: 'asyncparticles',
+      modName: 'AsyncParticles',
+      severity: 'yellow',
+      message: 'Particle Core уже оптимизирует и отсекает частицы — добавление AsyncParticles повышает риск гонок потоков и мерцаний (особенно в Botania).',
+    });
+  }
+
+  if (selectedSet.has('immersive-optimization')) {
+    for (const sleepId of ['entitysleep', 'enttick', 'sleepium', 'martensite-entity-tick-skiper'] as const) {
+      if (selectedSet.has(sleepId)) {
+        const sleepName = MOD_BY_ID.get(sleepId)?.name || sleepId;
+        warnings.push({
+          modId: sleepId,
+          modName: sleepName,
+          severity: 'yellow',
+          message: `Immersive Optimization уже адаптивно замедляет тики дальних сущностей — ${sleepName} дублирует троттлинг мобов.`,
+        });
+      }
+    }
+  }
+
+  if (hasAnyC2ME) {
+    if (selectedSet.has('parallel-world-save') && selectedSet.has('c2mer')) {
+      warnings.push({
+        modId: 'parallel-world-save',
+        modName: 'Parallel World Save',
+        severity: 'yellow',
+        message: 'C2MER уже переводит сохранение чанков в асинхронный режим — Parallel World Save создаёт двойной перехват записи мира.',
+      });
+    }
+    if (selectedSet.has('delta-chunk')) {
+      warnings.push({
+        modId: 'delta-chunk',
+        modName: 'Delta Chunk',
+        severity: 'yellow',
+        message: 'Связка Delta Chunk + C2ME создаёт конкуренцию асинхронных перехватчиков записи чанков на диск — оставьте только C2ME.',
+      });
+    }
+  } else if (selectedSet.has('parallel-world-save') && selectedSet.has('delta-chunk')) {
+    warnings.push({
+      modId: 'delta-chunk',
+      modName: 'Delta Chunk',
+      severity: 'yellow',
+      message: 'Параллельная запись Parallel World Save и дельта-сохранение Delta Chunk перехватывают один и тот же цикл записи чанков — оставьте один мод.',
+    });
+  }
+
+  if (selectedSet.has('resourcepackcached')) {
+    for (const rpId of ['keep-the-resourcepack', 'packforge'] as const) {
+      if (selectedSet.has(rpId)) {
+        const rpName = MOD_BY_ID.get(rpId)?.name || rpId;
+        warnings.push({
+          modId: rpId,
+          modName: rpName,
+          severity: 'yellow',
+          message: `ResourcePackCached уже кэширует распакованные ресурс-паки на диске — ${rpName} дублирует кэширование ZIP-архивов при запуске.`,
+        });
+      }
+    }
+  } else if (selectedSet.has('keep-the-resourcepack') && selectedSet.has('packforge')) {
+    warnings.push({
+      modId: 'packforge',
+      modName: 'PackForge',
+      severity: 'yellow',
+      message: 'Keep The ResourcePack и PackForge одновременно вмешиваются в распаковку ресурс-паков — оставьте один (лучше ResourcePackCached).',
+    });
+  }
+
   const hasAnySinytraConsumer = selectedMods.some(m => m.platform.includes('Sinytra'));
   const hasNonBridgeMod = selectedMods.some(
     m => m.id !== 'sinytra-connector' && m.id !== 'forgified-fabric-api' && m.id !== 'connector-extras'
@@ -999,7 +1149,9 @@ export function getCheckerTier(
     mod.id === 'bons-dlss-diet-complementary-unbound' ||
     mod.id === 'ksyxis' ||
     mod.id === 'better-tnt' ||
-    mod.id === 'perfomant-boom';
+    mod.id === 'perfomant-boom' ||
+    mod.id === 'zstdnet' ||
+    mod.id === 'asyncparticles';
 
   const hasBetterReplacement = Boolean(mod.supersededBy && mod.supersededBy.length > 0);
   const isSuitableNative =
@@ -1038,7 +1190,8 @@ export function getModEffectivenessScore(mod: ModItem): number {
   let score = 0;
   if (mod.isGroupLeader) score += 500;
   if (mod.isGroupAddon) score += 250;
-  if (mod.id === 'emberbium') score += 480;
+  if (mod.id === 'emberbium') score += 350;
+  if (mod.installed) score += 120;
   switch (mod.status) {
     case 'recommended':
       score += 1000;
@@ -1380,6 +1533,23 @@ export function isModIncompatibleWithSelection(
   return false;
 }
 
+export function isOutdatedOrUselessMod(
+  mod: ModItem,
+  selectedSet?: Set<string>,
+  prefs?: AssemblyPreferences
+): boolean {
+  if (
+    mod.status === 'danger' ||
+    mod.status === 'outdated' ||
+    mod.status === 'redundant' ||
+    Boolean(mod.coveredBy) ||
+    isUnsupportedOnForge(mod)
+  ) {
+    return true;
+  }
+  return getModSuperseder(mod, selectedSet, prefs, true) !== null;
+}
+
 export function shouldHideMod(
   mod: ModItem,
   selectedSet: Set<string>,
@@ -1387,10 +1557,8 @@ export function shouldHideMod(
   options: { hideIncompatible: boolean; hideUselessCovered: boolean }
 ): boolean {
   if (selectedSet.has(mod.id)) return false;
-  if (options.hideUselessCovered) {
-    if (mod.status === 'danger') return true;
-    if (isUnsupportedOnForge(mod)) return true;
-    if (getModSuperseder(mod, selectedSet, prefs, true) !== null) return true;
+  if (options.hideUselessCovered && isOutdatedOrUselessMod(mod, selectedSet, prefs)) {
+    return true;
   }
   if (options.hideIncompatible && isModIncompatibleWithSelection(mod, selectedSet, prefs)) {
     return true;
@@ -1459,20 +1627,6 @@ const HIGH_SYNERGY_IDS = new Set([
   'emi',
   'tmrv-updated',
   'fastali',
-  'saturn',
-  'neruina',
-  'log-begone',
-  'better-fps-render-distance',
-  'smooth-chunk-save',
-  'structure-essentials',
-  'get-it-together-drops',
-  'toast-control',
-  'modelfix',
-  'attributefix',
-  'deuf-duplicate-entity-uuid-fix',
-  'iris-flywheel-compat',
-  'too-fast',
-  'chunk-sending',
 ]);
 
 const NETWORK_MULTIPLAYER_IDS = new Set([
@@ -1484,7 +1638,6 @@ const NETWORK_MULTIPLAYER_IDS = new Set([
   'servercore',
   'connectivity',
   'connectivity-fix',
-  'chunk-sending',
   'vmp-forge',
   'very-many-players-vmp',
   'fast-ip-ping',
@@ -2376,138 +2529,6 @@ const EXPLICIT_RESOURCE_PROFILES: Record<string, ModResourceProfile> = {
     ramLoad: 0,
     tradeoffNote: 'Архивный порт Sodium: замените на Embeddium или Emberbium.',
   },
-  'iris-flywheel-compat': {
-    gains: ['Сохраняет GPU-инстансинг Create (Flywheel) при активных шейдерах Oculus'],
-    costs: ['Нужен только в связке Create + Oculus'],
-    shortTag: 'Шейдеры + Create ↑↑ · чинит отвал Flywheel',
-    hasTradeoff: false,
-    gpuLoad: -1,
-    vramLoad: 0,
-    cpuLoad: -1,
-    ramLoad: 0,
-    tradeoffNote: 'Мост между Oculus и Flywheel: без него при включении шейдеров механизмы Create переходят на медленный CPU-рендер.',
-  },
-  saturn: {
-    gains: ['ОЗУ ↓ в крупных сборках', 'Дополняет ModernFix и FerriteCore без пересечений'],
-    costs: ['Без нагрузки GPU/CPU'],
-    shortTag: 'ОЗУ ↓ · лёгкая оптимизация памяти',
-    hasTradeoff: false,
-    gpuLoad: 0,
-    vramLoad: 0,
-    cpuLoad: 0,
-    ramLoad: -1,
-    tradeoffNote: 'Убирает дублирование внутренних структур данных и оптимизирует аллокации Forge поверх ModernFix и FerriteCore.',
-  },
-  neruina: {
-    gains: ['Защита мира от крашей тикающих сущностей и блок-сущностей'],
-    costs: ['Минимальный оверхед; помечает проблемную сущность вместо падения сервера'],
-    shortTag: 'Анти-краш мира ↑↑ · защита от Ticking Entity',
-    hasTradeoff: false,
-    gpuLoad: 0,
-    vramLoad: 0,
-    cpuLoad: 0,
-    ramLoad: 0,
-    tradeoffNote: 'Изолирует исключения в тиках мобов и механизмов, спасая сохранения и серверы от цикличных крашей.',
-  },
-  'not-enough-crashes': {
-    gains: ['Возвращает в главное меню при краше вместо полного вылета игры'],
-    costs: ['Не повышает FPS; иногда скрывает первопричину каскадного сбоя после первого краша'],
-    shortTag: 'Анти-вылет при крашах · 0% FPS',
-    hasTradeoff: true,
-    gpuLoad: 0,
-    vramLoad: 0,
-    cpuLoad: 0,
-    ramLoad: 0,
-    tradeoffNote: 'Удобен для тестирования сборок, но после краша рекомендуется всё равно перезапустить клиент во избежание грязного состояния.',
-  },
-  'log-begone': {
-    gains: ['Убирает фризы I/O диска от спама ошибок/предупреждений в latest.log'],
-    costs: ['Не скрывает критические краши, но фильтрует повторяющийся лог-спам'],
-    shortTag: 'Меньше I/O фризов от логов · CPU ↓',
-    hasTradeoff: false,
-    gpuLoad: 0,
-    vramLoad: 0,
-    cpuLoad: -1,
-    ramLoad: 0,
-    tradeoffNote: 'Подавляет тысячи повторяющихся строк логов модов (OpenGL, NBT, рецепты) через regex, уменьшая микрофризы записи на диск.',
-  },
-  ryoamiclights: {
-    gains: ['Лёгкое динамическое освещение от факелов/предметов без утечек памяти'],
-    costs: ['Требует ObsidianUI + Architectury API', 'Чуть догружает чанк-апдейты света'],
-    shortTag: 'Дин. свет (быстрый) · нужен ObsidianUI',
-    hasTradeoff: false,
-    gpuLoad: 0,
-    vramLoad: 0,
-    cpuLoad: 0,
-    ramLoad: 0,
-    tradeoffNote: 'Чистый и производительный движок динамического освещения (порт LambDynamicLights) под Forge 1.20.1.',
-  },
-  modelfix: {
-    gains: ['Убирает прозрачные швы/полосы на 3D-предметах и в блоках'],
-    costs: ['Незаметная стоимость при запекании атласа'],
-    shortTag: 'Фикс швов моделей · 0 нагрузки',
-    hasTradeoff: false,
-    gpuLoad: 0,
-    vramLoad: 0,
-    cpuLoad: 0,
-    ramLoad: 0,
-    tradeoffNote: 'Исправляет баг ванильной генерации 3D-моделей предметов с ресурспаками и mipmap без потери FPS.',
-  },
-  'fps-reducer': {
-    gains: ['GPU и CPU ↓↓ при простое или свёрнутом окне'],
-    costs: ['Альтернатива Dynamic FPS — не стоит ставить оба вместе'],
-    shortTag: 'GPU/CPU в фоне ↓↓ (аналог Dynamic FPS)',
-    hasTradeoff: false,
-    gpuLoad: -2,
-    vramLoad: 0,
-    cpuLoad: -2,
-    ramLoad: 0,
-    tradeoffNote: 'Снижает FPS и звук при бездействии пользователя; при наличии Dynamic FPS дублирует его функциональность.',
-  },
-  'better-fps-render-distance': {
-    gains: ['Меньше лишних перерисовок чанков на клиенте по краям сферы обзора'],
-    costs: ['Требует библиотеку Cupboard'],
-    shortTag: 'Дальние чанки (клиент) ↑ · нужен Cupboard',
-    hasTradeoff: false,
-    gpuLoad: -1,
-    vramLoad: 0,
-    cpuLoad: -1,
-    ramLoad: 0,
-    tradeoffNote: 'Оптимизирует форму и обновление клиентского круга чанков, снижая лишние перестройки геометрии.',
-  },
-  'smooth-chunk-save': {
-    gains: ['Убирает периодические фризы автосохранения мира (раз в ~45 сек)'],
-    costs: ['Требует Cupboard'],
-    shortTag: 'Автосейв мира без фризов · CPU ↓',
-    hasTradeoff: false,
-    gpuLoad: 0,
-    vramLoad: 0,
-    cpuLoad: -1,
-    ramLoad: 0,
-    tradeoffNote: 'Размазывает сохранение чанков на диск равномерно по тикам вместо единовременного лаг-спайка.',
-  },
-  'chunk-sending': {
-    gains: ['Плавный вход на сервер и быстрые телепорты без фризов сети'],
-    costs: ['Эффект раскрывается на серверах/в онлайне (нужен Cupboard)'],
-    shortTag: 'Загрузка чанков по сети ↑ · нужен Cupboard',
-    hasTradeoff: false,
-    gpuLoad: 0,
-    vramLoad: 0,
-    cpuLoad: -1,
-    ramLoad: 0,
-    tradeoffNote: 'Распределяет очередь отправки чанков игрокам, предотвращая сетевые пробки и скачки пинга.',
-  },
-  'get-it-together-drops': {
-    gains: ['Объединяет разбросанный дроп в компактные стаки (TPS и FPS на фермах ↑)'],
-    costs: ['Отсутствуют'],
-    shortTag: 'Дроп-стаки / TPS ↑ · без нагрузки',
-    hasTradeoff: false,
-    gpuLoad: 0,
-    vramLoad: 0,
-    cpuLoad: -1,
-    ramLoad: 0,
-    tradeoffNote: 'Современно объединяет лежащие рядом предметы с радиусом подбора, сильно разгружая фермы и карьеры.',
-  },
 };
 
 export function getModResourceProfile(mod: ModItem): ModResourceProfile {
@@ -2526,6 +2547,27 @@ export function getModResourceProfile(mod: ModItem): ModResourceProfile {
       ramLoad: 1,
       tradeoffNote:
         mod.warning || 'Мод относится к категории опасных/плацебо: пользы нет, зато возможны статтеры, утечки или порча мира.',
+    };
+  }
+
+  if (mod.id === 'configured' || mod.id === 'controlling') {
+    return {
+      gains: [
+        mod.id === 'configured'
+          ? 'Внутриигровой редактор config/* через меню Mods'
+          : 'Поиск и фильтр конфликтов клавиш в меню управления',
+      ],
+      costs: ['На FPS/TPS не влияет (чистый QoL-интерфейс)'],
+      shortTag: 'QoL-интерфейс (0% FPS) · без нагрузки ПК',
+      hasTradeoff: false,
+      gpuLoad: 0,
+      vramLoad: 0,
+      cpuLoad: 0,
+      ramLoad: 0,
+      tradeoffNote:
+        mod.id === 'configured'
+          ? 'Упрощает настройку конфигов прямо в игре; в самой отрисовке мира не участвует.'
+          : 'Удобный поиск биндов поверх Searchables; не нагружает ни CPU, ни GPU.',
     };
   }
 
@@ -2736,23 +2778,19 @@ export function getModResourceProfile(mod: ModItem): ModResourceProfile {
 
 export const LIBRARY_CONSUMER_MAP: Record<string, string[]> = {
   'matlib': ['enhanced-block-entities-reloaded'],
-  'cupboard': [
-    'connectivity',
-    'better-fps-render-distance',
-    'smooth-chunk-save',
-    'chunk-sending',
-    'structure-essentials',
-    'recipe-essentials',
-  ],
+  'cupboard': ['connectivity'],
   'sodium-embeddium-options-api': ['sodium-embeddium-dynamic-lights'],
-  'fzzy-config': ['particle-core', 'emi-loot'],
-  'kotlin-for-forge': ['fzzy-config', 'particle-core', 'light-config', 'observable', 'lazyyyyy', 'emi-loot'],
+  'fzzy-config': ['particle-core', 'emi-loot', 'emiffect'],
+  'kotlin-for-forge': ['fzzy-config', 'particle-core', 'light-config', 'observable', 'lazyyyyy', 'emi-loot', 'emiffect'],
   'geckolib': ['geckolib-animation-optimizer', 'geckolibbetterfps'],
   'cloth-config-v12': ['sodium-embeddium-dynamic-lights', 'more-culling-reforged', 'entity-culling', 'dynamic-fps', 'culllessleaves-reforged'],
   'resourceful-config': ['structure-layout-optimizer'],
-  'placebo': ['fastsuite', 'fastfurnace', 'fastworkbench', 'toast-control'],
-  'obsidianui': ['ryoamiclights'],
-  'architectury-api': ['obsidianui', 'ryoamiclights'],
+  'puzzles-lib': ['fast-item-frames'],
+  'almanac': ['let-me-despawn'],
+  'placebo': ['fastsuite', 'fastfurnace', 'fastworkbench'],
+  'architectury-api': ['observable'],
+  'rinlib': ['structure-dfu-cache'],
+  'searchables': ['controlling'],
 };
 
 export const SINYTRA_BRIDGE_IDS = new Set(['sinytra-connector', 'forgified-fabric-api', 'connector-extras']);
@@ -2780,16 +2818,13 @@ const SUBSYSTEM_DEFINITIONS: Array<{
       kerria: 2.5,
       'sodium-chloride': 2.5,
       'embeddium-extras': 2.5,
-      'textrues-embeddium-options': 0.8,
       'accelerated-rendering': 4,
       'accelerated-rendering-turned': 3,
       gputape: 2,
       oculus: 2.5,
       emberlens: 2,
-      'iris-flywheel-compat': 2.5,
       'faster-iris-shadow-mapper': 1.8,
       shadowlod: 1.5,
-      modelfix: 0.8,
       xenon: 9,
       rubidium: 7,
       prismanium: 5,
@@ -2813,12 +2848,10 @@ const SUBSYSTEM_DEFINITIONS: Array<{
     weights: {
       modernfix: 10.5,
       ferritecore: 6.5,
-      saturn: 2.5,
       'alltheleaks-memory-leak-fix': 3.5,
       jasione: 2.5,
       'duplicate-nbt-flattener': 2,
       'put-a-plug-in-it-papi': 1.5,
-      'log-begone': 1.2,
       thulium: 1.5,
       mcreatormemfix: 1,
       'fix-gpu-memory-leak': 1,
@@ -2835,18 +2868,12 @@ const SUBSYSTEM_DEFINITIONS: Array<{
       'immersive-optimization': 4,
       badoptimizations: 3,
       servercore: 3.5,
-      neruina: 2.0,
-      'too-fast': 1.2,
       'alternate-current': 2,
       'entity-collision-optimization': 1.5,
       'villager-optimizer': 1.5,
       'capability-fix-revived': 1.5,
       'falling-blocks-fps-fix': 1,
       fastspawner: 1,
-      attributefix: 0.8,
-      'deuf-duplicate-entity-uuid-fix': 1.0,
-      netherportalfix: 0.6,
-      'not-enough-crashes': 0.5,
       flywheel: 2,
       vanillin: 2,
       'geckolibbetterfps': 2.5,
@@ -2881,16 +2908,12 @@ const SUBSYSTEM_DEFINITIONS: Array<{
       noisiumed: 4,
       solix: 2.5,
       'structure-layout-optimizer': 2.5,
-      'structure-essentials': 1.5,
-      'smooth-chunk-save': 1.8,
-      'better-fps-render-distance': 1.6,
       'structure-dfu-cache': 1.5,
       'concurrent-chunk-management-engine-forge-c2me': 2.5,
       'c2me-concurrent-chunk-management-engine': 2,
       c2mer: 1.8,
       'distant-horizons': 3,
       lightstar: 1.5,
-      ryoamiclights: 1.0,
       chunky: 1.2,
       noisium: 1.8,
     },
@@ -2910,7 +2933,6 @@ const SUBSYSTEM_DEFINITIONS: Array<{
       'reload-looping-sound-fix': 1,
       soundgc: 0.8,
       restmode: 0.8,
-      'fps-reducer': 0.8,
       framepacer: 0.8,
       'smooth-boot-reloaded': 1,
       lightspeedre: 1.2,
@@ -2928,14 +2950,12 @@ const SUBSYSTEM_DEFINITIONS: Array<{
     groupIds: ['networking', 'items-clearlag', 'recipes-jei'],
     weights: {
       clumps: 2.5,
-      'get-it-together-drops': 1.6,
       'let-me-despawn': 1.5,
       'packet-fixer': 1,
       'krypton-reno': 2.5,
       'krypton-hybrid': 1.8,
       pluto: 1.2,
       connectivity: 1.8,
-      'chunk-sending': 1.5,
       'vmp-forge': 2,
       'very-many-players-vmp': 1.5,
       emi: 1.5,
@@ -2948,8 +2968,6 @@ const SUBSYSTEM_DEFINITIONS: Array<{
       fastvancements: 0.8,
       'fast-recipe-search': 0.8,
       'jei-emi-optimizations': 1.0,
-      'toast-control': 0.9,
-      'recipe-essentials': 0.9,
       fastali: 1,
       'advanced-loot-info-ali': 0.5,
     },
@@ -3085,12 +3103,12 @@ function computeArtifactRiskInternal(
     });
   }
 
-  // 2. Mixin surface density from stacking many non-library, non-diagnostic optimization mods (Sinytra bridges scored separately below)
+  // 2. Mixin surface density from stacking many non-library optimization mods (Sinytra bridges scored separately below)
   const n = analysis.selectedMods.filter(
-    m => !PURE_LIBRARY_MOD_IDS.has(m.id) && !SINYTRA_BRIDGE_IDS.has(m.id) && m.status !== 'diagnostic'
+    m => !PURE_LIBRARY_MOD_IDS.has(m.id) && !SINYTRA_BRIDGE_IDS.has(m.id)
   ).length;
-  const excessCount = Math.max(0, n - 20);
-  const stackRisk = excessCount > 0 ? Math.min(20, Math.round(excessCount * 0.25 * scaleMult)) : scale === 'heavy' && n >= 10 ? 4 : 0;
+  const excessCount = Math.max(0, n - 18);
+  const stackRisk = excessCount > 0 ? Math.min(22, Math.round(excessCount * 0.36 * scaleMult)) : scale === 'heavy' && n >= 10 ? 4 : 0;
   if (stackRisk > 0) {
     rawRisk += stackRisk;
     const scaleTag = scale === 'heavy' ? ', пак 200+ модов' : scale === 'light' ? ', лёгкий пак' : '';
@@ -3207,17 +3225,6 @@ function computeArtifactRiskInternal(
     });
   }
 
-  if (selectedSet.has('sodium-sightline') && (selectedSet.has('oculus') || selectedSet.has('emberlens') || prefs?.useShaders)) {
-    const sightlineRisk = 5;
-    rawRisk += sightlineRisk;
-    addModRisk('sodium-sightline', sightlineRisk);
-    factors.push({
-      label: 'Sightline с шейдерами (пропажа теней за спиной игрока)',
-      deltaPct: sightlineRisk,
-      tone: 'risk',
-    });
-  }
-
   // 6. Distant Horizons & async chunk threaders & Create interactions
   let worldRisk = 0;
   if (selectedSet.has('distant-horizons')) {
@@ -3284,14 +3291,6 @@ function computeArtifactRiskInternal(
     cautionRisk += 4;
     addModRisk('embeddium-extras', 3);
   }
-  if (selectedSet.has('more-culling-reforged') && selectedSet.has('fast-item-frames')) {
-    cautionRisk += 2;
-    addModRisk('more-culling-reforged', 2);
-  }
-  if (selectedSet.has('entity-culling') && selectedSet.has('itemculler')) {
-    cautionRisk += 2;
-    addModRisk('itemculler', 2);
-  }
   if (cautionRisk > 0) {
     rawRisk += cautionRisk;
     factors.push({
@@ -3305,7 +3304,7 @@ function computeArtifactRiskInternal(
   let mitigation = 0;
   if (selectedSet.has('modernfix')) mitigation += 3;
   if (selectedSet.has('alltheleaks-memory-leak-fix')) mitigation += 2;
-  if (selectedSet.has('packet-fixer') || selectedSet.has('capability-fix-revived') || selectedSet.has('fix-gpu-memory-leak') || selectedSet.has('neruina')) {
+  if (selectedSet.has('packet-fixer') || selectedSet.has('capability-fix-revived') || selectedSet.has('fix-gpu-memory-leak')) {
     mitigation += 1;
   }
   if (selectedSet.has('distant-horizons') && selectedSet.has('distant-horizons-memory-fix-dh')) {
@@ -3404,9 +3403,7 @@ export function evaluateDubiousMods(
     const isPotatoGpuMismatch =
       (mod.id === 'accelerated-rendering' || mod.id === 'accelerated-rendering-turned') &&
       (prefs?.gpu === 'integrated' || prefs?.goal === 'potato');
-    const isCoreProtected = ['embeddium', 'emberbium', 'modernfix', 'ferritecore', 'entity-culling'].includes(mod.id);
-    const hasShadersInPack = selectedSet.has('oculus') || selectedSet.has('emberlens') || Boolean(prefs?.useShaders);
-    const hasCreateContext = Boolean(prefs?.useCreate || selectedSet.has('flywheel') || selectedSet.has('vanillin'));
+    const isCoreProtected = ['embeddium', 'emberbium', 'modernfix', 'ferritecore'].includes(mod.id);
 
     if (tierInfo.tier === 'red' || !bridge.compatible) {
       severity = 'high';
@@ -3436,17 +3433,6 @@ export function evaluateDubiousMods(
     } else if (mod.id === 'embeddium-extras' && selectedSet.has('sodium-chloride')) {
       severity = 'medium';
       reason = 'Частично дублирует функции (Sodium) Chloride — лучше оставить один аддон меню.';
-    } else if (mod.id === 'sodium-sightline' && hasShadersInPack) {
-      severity = 'medium';
-      reason = 'Sightline отсекает чанки за спиной камеры — с шейдерами Oculus/Emberlens пропадают дальние тени от солнца.';
-    } else if (mod.id === 'itemculler' && selectedSet.has('entity-culling')) {
-      severity = 'medium';
-      reason = 'Дублирует Entity Culling: tr7zw Entity Culling уже асинхронно скрывает выброшенный дроп за стенами.';
-    } else if (mod.id === 'more-culling-reforged' && (selectedSet.has('fast-item-frames') || selectedSet.has('culllessleaves-reforged'))) {
-      severity = selectedSet.has('fast-item-frames') ? 'medium' : 'low';
-      reason = selectedSet.has('fast-item-frames')
-        ? 'Пересекается с Fast Item Frames и/или CullLessLeaves — отключите куллинг рамок и листвы в config/moreculling.toml (шаблон в «Конфигах»).'
-        : 'При наличии CullLessLeaves Reforged отключите куллинг листвы в config/moreculling.toml.';
     } else if (
       mod.platform.includes('Sinytra') &&
       (prefs?.allowSinytra === false || prefs?.portStrategy === 'native-forge')
@@ -3466,9 +3452,13 @@ export function evaluateDubiousMods(
       severity = 'medium';
       reason =
         warnings[0]?.message ||
-        mod.warning ||
-        mod.bestAlternative ||
-        'Условный, устаревший или требующий точной настройки мод.';
+        (mod.id === 'zstdnet'
+          ? 'Заменяет сетевое zlib-сжатие на Zstandard (Zstd): должен стоять и на сервере, и у всех клиентов, иначе игроки не смогут подключиться.'
+          : mod.id === 'asyncparticles'
+            ? 'Асинхронные тики частиц могут вызывать мерцание или пропадание эффектов в Botania и с кастомными частицами.'
+            : mod.warning ||
+              mod.bestAlternative ||
+              'Условный, устаревший или требующий точной настройки мод.');
     } else if (
       mod.id === 'accelerated-rendering' ||
       mod.id === 'accelerated-rendering-turned' ||
@@ -3484,9 +3474,31 @@ export function evaluateDubiousMods(
           : mod.id === 'more-culling-reforged'
             ? 'Агрессивный куллинг граней — при наложении с другими куллерами возможны просветы текстур.'
             : mod.warning || mod.bestAlternative || 'Экспериментальный или требовательный к видеопамяти/миксинам мод.';
-    } else if (mod.id === 'entity-culling' && hasCreateContext) {
+    } else if (
+      mod.id === 'flywheel' &&
+      (selectedSet.has('oculus') || selectedSet.has('emberlens'))
+    ) {
       severity = 'low';
-      reason = 'Для Create внесите контрапшены (create:contraption) в whitelist config/entityculling.json (готовый конфиг во вкладке «Конфиги»), чтобы ветряки не мерцали за стенами.';
+      reason = 'С шейдерами Oculus/Emberlens GPU-инстансинг Flywheel 1.0 отключается без моста (Iris & Oculus Flywheel Compat / Colorwheel), снижая FPS у механизмов Create.';
+    } else if (
+      mod.id === 'distant-horizons' &&
+      (selectedSet.has('concurrent-chunk-management-engine-forge-c2me') ||
+        selectedSet.has('c2me-concurrent-chunk-management-engine') ||
+        selectedSet.has('c2mer'))
+    ) {
+      severity = 'low';
+      reason = 'В паре с C2ME одновременно нагружает все потоки CPU генерацией LOD и чанков — ограничьте CPU Load в конфиге Distant Horizons.';
+    } else if (
+      mod.id === 'chunky' &&
+      (selectedSet.has('distant-horizons') ||
+        selectedSet.has('concurrent-chunk-management-engine-forge-c2me') ||
+        selectedSet.has('c2me-concurrent-chunk-management-engine') ||
+        selectedSet.has('c2mer'))
+    ) {
+      severity = 'low';
+      reason = selectedSet.has('distant-horizons')
+        ? 'Во время активной предгенерации (/chunky start) временно отключайте фоновую генерацию LOD в Distant Horizons, чтобы не перегружать CPU и диск.'
+        : 'Предгенерация Chunky в паре с C2ME утилизирует все ядра CPU и диск — следите за нагревом/ОЗУ во время /chunky start.';
     } else if (NETWORK_MULTIPLAYER_IDS.has(mod.id) && prefs?.mode === 'singleplayer' && mod.id !== 'krypton-reno') {
       severity = 'low';
       reason = 'Серверный/сетевой оптимизатор: в одиночной игре почти не даёт прироста.';
@@ -3494,7 +3506,7 @@ export function evaluateDubiousMods(
 
     if (!severity) continue;
 
-    const analog = mod.id === 'entity-culling' ? undefined : getPreferredBetterAnalog(mod, selectedSet, prefs);
+    const analog = getPreferredBetterAnalog(mod, selectedSet, prefs);
     const hasBetterReplacement = Boolean(
       analog &&
         analog.id !== mod.id &&
@@ -3526,18 +3538,12 @@ export function evaluateDubiousMods(
 const HEAVY_SCALE_BOOSTER_IDS = new Set([
   'modernfix',
   'ferritecore',
-  'saturn',
   'alltheleaks-memory-leak-fix',
   'jasione',
   'duplicate-nbt-flattener',
   'capability-fix-revived',
   'structure-dfu-cache',
   'put-a-plug-in-it-papi',
-  'log-begone',
-  'neruina',
-  'deuf-duplicate-entity-uuid-fix',
-  'attributefix',
-  'toast-control',
   'smooth-boot-reloaded',
   'lightspeedre',
   'fastsuite',
@@ -3558,7 +3564,6 @@ const LIGHT_SCALE_MICRO_FIX_IDS = new Set([
 const SHADER_SUPPORT_MOD_IDS = new Set([
   'oculus',
   'emberlens',
-  'iris-flywheel-compat',
   'faster-iris-shadow-mapper',
   'shadowlod',
   'unofficial-luxium-compatibility-luxium-oculus',
@@ -3568,7 +3573,6 @@ const SHADER_SUPPORT_MOD_IDS = new Set([
 const CREATE_PRIORITY_MOD_IDS = new Set([
   'flywheel',
   'vanillin',
-  'iris-flywheel-compat',
   'starlight-with-create-fix',
   'radium-re-reforged',
   'immersive-optimization',
@@ -3729,12 +3733,6 @@ function computePackScoreInternal(
   if ((selectedSet.has('oculus') || selectedSet.has('emberlens')) && selectedSet.has('shadowlod') && (!prefs || prefs.useShaders)) {
     bonus += 0.7;
   }
-  if (selectedSet.has('oculus') && selectedSet.has('flywheel') && selectedSet.has('iris-flywheel-compat')) {
-    bonus += 1.2;
-  }
-  if (selectedSet.has('more-culling-reforged') && selectedSet.has('enhanced-block-entities-reloaded')) {
-    bonus += 0.6;
-  }
   bonus = Math.min(8.0, bonus);
 
   // Calibrated stability, bloat, hardware fit & artifact penalties
@@ -3747,63 +3745,19 @@ function computePackScoreInternal(
     if (m.status === 'danger') penalty += 16;
     if (isUnsupportedOnForge(m)) penalty += 16;
   }
-  let overlapPairs = 0;
-  if (selectedSet.has('embeddium-extras') && selectedSet.has('sodium-chloride')) {
-    penalty += 2;
-    overlapPairs++;
-  }
-  if (selectedSet.has('more-culling-reforged') && selectedSet.has('culllessleaves-reforged')) {
-    penalty += 1;
-    overlapPairs++;
-  }
-  if (selectedSet.has('more-culling-reforged') && selectedSet.has('fast-item-frames')) {
-    penalty += 1;
-    overlapPairs++;
-  }
-  if (selectedSet.has('entity-culling') && selectedSet.has('itemculler')) {
-    penalty += 1.5;
-    overlapPairs++;
-  }
-  if (
-    selectedSet.has('clab') &&
-    (selectedSet.has('culllessleaves-reforged') ||
-      selectedSet.has('more-culling-reforged') ||
-      selectedSet.has('leaves-culling') ||
-      selectedSet.has('sodium-leaf-culling-unofficial') ||
-      selectedSet.has('sodium-embeddium-leaf-culling'))
-  ) {
-    penalty += 1.5;
-    overlapPairs++;
-  }
-  if (selectedSet.has('dynamic-fps') && (selectedSet.has('restmode') || selectedSet.has('idle-boost') || selectedSet.has('fps-reducer'))) {
-    penalty += 1.5;
-    overlapPairs++;
-  }
-  if (selectedSet.has('ryoamiclights') && selectedSet.has('sodium-embeddium-dynamic-lights')) {
-    penalty += 1.5;
-    overlapPairs++;
-  }
-  if (selectedSet.has('get-it-together-drops') && selectedSet.has('itemmerge')) {
-    penalty += 1.5;
-    overlapPairs++;
-  }
-  if (selectedSet.has('particle-core') && selectedSet.has('particull')) {
-    penalty += 1.5;
-    overlapPairs++;
-  }
+  if (selectedSet.has('embeddium-extras') && selectedSet.has('sodium-chloride')) penalty += 2;
+  if (selectedSet.has('more-culling-reforged') && selectedSet.has('culllessleaves-reforged')) penalty += 1;
+  if (selectedSet.has('dynamic-fps') && (selectedSet.has('restmode') || selectedSet.has('idle-boost'))) penalty += 1.5;
+  if (selectedSet.has('particle-core') && selectedSet.has('particull')) penalty += 1.5;
 
   const nonLibraryModCount = analysis.selectedMods.filter(
     m =>
-      m.status !== 'diagnostic' &&
       !(PURE_LIBRARY_MOD_IDS.has(m.id) && !zeroEffectiveSet.has(m.id)) &&
       !(SINYTRA_BRIDGE_IDS.has(m.id) && !zeroEffectiveSet.has(m.id))
   ).length;
-  const bloatThreshold = prefs?.packScale === 'heavy' ? 66 : 56;
-  const excessModPenalty =
-    nonLibraryModCount > bloatThreshold
-      ? Math.min(8, Math.round((nonLibraryModCount - bloatThreshold) * 0.4))
-      : 0;
-  const bloatPenalty = zeroEffectiveSet.size * 2 + excessModPenalty;
+  const bloatPenalty =
+    zeroEffectiveSet.size * 2 +
+    (nonLibraryModCount > 45 ? Math.min(8, Math.round((nonLibraryModCount - 45) * 0.4)) : 0);
 
   let hardwareFitDelta = 0;
   if (prefs) {
@@ -3826,9 +3780,6 @@ function computePackScoreInternal(
         hardwareFitDelta += selectedSet.has('faster-iris-shadow-mapper') || selectedSet.has('shadowlod') ? 2 : 1;
       } else if (ids.length >= 4) {
         hardwareFitDelta -= 5;
-      }
-      if (selectedSet.has('sodium-sightline')) {
-        hardwareFitDelta -= 3;
       }
     } else if (hasShaderMod) {
       hardwareFitDelta -= 3;
@@ -3855,52 +3806,17 @@ function computePackScoreInternal(
       : 0;
 
   const rawEffectiveScore = ids.length === 0 ? 0 : sumSubsystems + bonus + Math.max(0, hardwareFitDelta);
-
-  // Multifactorial 0..100 factor scores
-  const efficiencyScore =
+  const rawTotal =
     ids.length === 0
       ? 0
-      : Math.max(0, Math.min(100, Math.round(sumSubsystems + bonus + hardwareFitDelta)));
+      : sumSubsystems + bonus + hardwareFitDelta - penalty - bloatPenalty - artifactPenalty;
+  const totalScore = Math.max(0, Math.min(100, Math.round(rawTotal)));
+
+  const efficiencyScore = ids.length === 0 ? 0 : Math.min(100, Math.round(sumSubsystems + bonus));
   const stabilityScore =
     ids.length === 0
       ? 0
-      : Math.max(
-          0,
-          Math.min(
-            100,
-            Math.round(100 - (penalty + Math.max(0, -hardwareFitDelta) * 1.35) * 1.45)
-          )
-        );
-  const cleanlinessScore =
-    ids.length === 0
-      ? 0
-      : Math.max(
-          0,
-          Math.min(
-            100,
-            Math.round(
-              100 -
-                zeroEffectiveSet.size * 14 -
-                excessModPenalty * 2 -
-                overlapPairs * 8 -
-                analysis.conflicts.length * 18
-            )
-          )
-        );
-  const visualSafetyScore =
-    ids.length === 0
-      ? 0
-      : artifactRisk.chancePct <= 12
-        ? 100
-        : Math.max(0, Math.min(100, Math.round(100 - (artifactRisk.chancePct - 12) * 1.35)));
-
-  // Multifactorial averaged score across the 4 pillars (weights sum to 1.00)
-  const averagedScore =
-    efficiencyScore * 0.38 +
-    stabilityScore * 0.30 +
-    cleanlinessScore * 0.18 +
-    visualSafetyScore * 0.14;
-  const totalScore = ids.length === 0 ? 0 : Math.max(0, Math.min(100, Math.round(averagedScore)));
+      : Math.max(0, Math.min(100, Math.round(100 - (penalty + bloatPenalty + artifactPenalty + Math.max(0, -hardwareFitDelta)) * 1.35)));
 
   return {
     totalScore,
@@ -3912,8 +3828,6 @@ function computePackScoreInternal(
     scoreBreakdown: {
       efficiencyScore,
       stabilityScore,
-      cleanlinessScore,
-      visualSafetyScore,
       coverageScore: Math.round(sumSubsystems),
       synergyBonus: Math.round(bonus * 10) / 10,
       penaltyPoints: Math.round(penalty),
@@ -3967,6 +3881,7 @@ function buildReplacementEvalSet(
   const hardDeps = MOD_HARD_DEPENDENCIES[candidate.id] || [];
   if (hardDeps.includes('embeddium') && removedEmberbium && !next.has('embeddium')) {
     next.add('embeddium');
+    // Also clean any Emberbium-specific peer (e.g. Emberlens) if Embeddium is swapped in
     if (next.has('emberlens') && candidate.id !== 'emberlens') {
       next.delete('emberlens');
     }
@@ -3978,66 +3893,27 @@ function buildReplacementEvalSet(
     }
   }
 
-  // Pull non-conflicting transitive hard dependencies (e.g. fzzy-config, kotlin-for-forge, resourceful-config)
-  // so valid replacements are not artificially penalized for missing libraries during comparison.
-  const transitiveDeps = getTransitiveDependencies(candidate.id, new Set(), next);
-  for (const depId of transitiveDeps) {
-    if (next.has(depId)) continue;
-    const depConflictsWithActive = getRuleConflictingIds(depId).some(cid => next.has(cid));
-    const depPeerActive = findExclusivePoolPeers(depId).some(pid => next.has(pid));
-    if (!depConflictsWithActive && !depPeerActive) {
-      next.add(depId);
-    }
-  }
-
   return next;
 }
 
 function getPreferredBetterAnalog(mod: ModItem, selectedSet: Set<string>, prefs?: AssemblyPreferences): ModItem | null {
-  const isCandidateValid = (c: ModItem): boolean => {
-    if (c.id === mod.id) return false;
-    if (prefs && !getRecipeBridgeStatus(c, selectedSet, prefs).compatible) return false;
-    if (mod.id === 'emberlens' && c.id === 'oculus' && selectedSet.has('emberbium')) return false;
-    if (mod.id === 'oculus' && c.id === 'emberlens' && selectedSet.has('embeddium')) return false;
-    return true;
-  };
-
-  const sortPreferred = (list: ModItem[]): ModItem[] =>
-    list.sort((a, b) => {
-      const aActive = selectedSet.has(a.id) ? 1 : 0;
-      const bActive = selectedSet.has(b.id) ? 1 : 0;
-      if (aActive !== bActive) return bActive - aActive;
-      return getModEffectivenessScore(b) - getModEffectivenessScore(a);
-    });
-
-  // Tier 1: Explicit curated replacements (supersededBy, supersededWhenAll, Fabric->Forge swap, GeckoLib fix)
-  const exactCandidates: ModItem[] = [];
+  const candidates: ModItem[] = [];
   if (mod.supersededBy) {
     for (const id of mod.supersededBy) {
       const m = MOD_BY_ID.get(id);
-      if (m && !isUnsupportedOnForge(m) && isCandidateValid(m)) exactCandidates.push(m);
+      if (m && !isUnsupportedOnForge(m)) candidates.push(m);
     }
   }
   if (mod.supersededWhenAll) {
     for (const id of mod.supersededWhenAll) {
       const m = MOD_BY_ID.get(id);
-      if (m && !isUnsupportedOnForge(m) && isCandidateValid(m)) exactCandidates.push(m);
+      if (m && !isUnsupportedOnForge(m)) candidates.push(m);
     }
   }
   if (isUnsupportedOnForge(mod) && FABRIC_TO_FORGE_SWAP[mod.id]) {
     const swap = MOD_BY_ID.get(FABRIC_TO_FORGE_SWAP[mod.id]);
-    if (swap && isCandidateValid(swap)) exactCandidates.push(swap);
+    if (swap) candidates.push(swap);
   }
-  if (mod.id === 'geckolib-animation-optimizer' && selectedSet.has('geckolib')) {
-    const better = MOD_BY_ID.get('geckolibbetterfps');
-    if (better && isCandidateValid(better)) exactCandidates.push(better);
-  }
-  if (exactCandidates.length > 0) {
-    return sortPreferred(exactCandidates)[0];
-  }
-
-  // Tier 2: Exclusive engine pool peers & dual-port counterparts
-  const poolCandidates: ModItem[] = [];
   const dual = getDualPortPairForMod(mod.id);
   if (dual && dual.forgeModId !== mod.id) {
     const nvidiumBlockedByPrefs =
@@ -4045,29 +3921,21 @@ function getPreferredBetterAnalog(mod: ModItem, selectedSet: Set<string>, prefs?
       Boolean(prefs && (!prefs.allowSinytra || prefs.gpu !== 'nvidia' || prefs.useShaders));
     if (mod.id !== 'nvidium' || nvidiumBlockedByPrefs) {
       const forgeCounterpart = MOD_BY_ID.get(dual.forgeModId);
-      if (forgeCounterpart && !isUnsupportedOnForge(forgeCounterpart) && isCandidateValid(forgeCounterpart)) {
-        poolCandidates.push(forgeCounterpart);
-      }
+      if (forgeCounterpart && !isUnsupportedOnForge(forgeCounterpart)) candidates.push(forgeCounterpart);
     }
-  }
-  for (const pid of findExclusivePoolPeers(mod.id)) {
-    const pm = MOD_BY_ID.get(pid);
-    if (
-      pm &&
-      !isUnsupportedOnForge(pm) &&
-      pm.status !== 'danger' &&
-      getModEffectivenessScore(pm) > getModEffectivenessScore(mod) &&
-      isCandidateValid(pm)
-    ) {
-      poolCandidates.push(pm);
-    }
-  }
-  if (poolCandidates.length > 0) {
-    return sortPreferred(poolCandidates)[0];
   }
 
-  // Tier 3: Group leader fallback only for non-content-fix exclusive/outdated/conflicting mods
-  if (mod.groupId && !CONTENT_FIX_IDS.has(mod.id)) {
+  // Same exclusive sub-pool peers (e.g. render-upscalers -> AMD FSR, mob-despawn -> Let Me Despawn)
+  const exclusivePoolPeers = findExclusivePoolPeers(mod.id);
+  for (const pid of exclusivePoolPeers) {
+    const pm = MOD_BY_ID.get(pid);
+    if (pm && !isUnsupportedOnForge(pm) && pm.status !== 'danger' && getModEffectivenessScore(pm) > getModEffectivenessScore(mod)) {
+      candidates.push(pm);
+    }
+  }
+
+  // Only suggest group leader for exclusive slots, direct conflicts, or outdated/redundant/danger entries
+  if (mod.groupId) {
     const grp = MOD_GROUPS.find(g => g.id === mod.groupId);
     const modConflictsLeader = grp ? getRuleConflictingIds(mod.id).includes(grp.leaderId) : false;
     const isReplacementCandidate =
@@ -4078,35 +3946,38 @@ function getPreferredBetterAnalog(mod: ModItem, selectedSet: Set<string>, prefs?
       mod.status === 'danger';
     if (grp && grp.leaderId !== mod.id && !grp.addonIds.includes(mod.id) && isReplacementCandidate) {
       const leader = MOD_BY_ID.get(grp.leaderId);
-      if (leader && leader.id !== mod.id && isCandidateValid(leader)) {
-        return leader;
-      }
+      if (leader && leader.id !== mod.id) candidates.push(leader);
     }
   }
 
-  return null;
-}
-
-const SOLO_WARNING_KEYS_CACHE = new Map<string, Set<string>>();
-
-function getSoloWarningKeys(modId: string): Set<string> {
-  let cached = SOLO_WARNING_KEYS_CACHE.get(modId);
-  if (!cached) {
-    cached = new Set(analyzeSelection([modId]).warnings.map(w => `${w.modId}:${w.message}`));
-    SOLO_WARNING_KEYS_CACHE.set(modId, cached);
+  if (mod.id === 'geckolib-animation-optimizer' && selectedSet.has('geckolib')) {
+    const better = MOD_BY_ID.get('geckolibbetterfps');
+    if (better) candidates.push(better);
   }
-  return cached;
-}
 
-type PackScoreResult = ReturnType<typeof computePackScoreInternal>;
+  // Respect Emberbium <-> Oculus/Emberlens pairing when one render core is already chosen in the pack
+  const valid = candidates.filter(c => {
+    if (c.id === mod.id) return false;
+    if (prefs && !getRecipeBridgeStatus(c, selectedSet, prefs).compatible) return false;
+    if (mod.id === 'emberlens' && c.id === 'oculus' && selectedSet.has('emberbium')) return false;
+    if (mod.id === 'oculus' && c.id === 'emberlens' && selectedSet.has('embeddium')) return false;
+    return true;
+  });
+  if (valid.length === 0) return null;
+  valid.sort((a, b) => {
+    const aActive = selectedSet.has(a.id) ? 1 : 0;
+    const bActive = selectedSet.has(b.id) ? 1 : 0;
+    if (aActive !== bActive) return bActive - aActive;
+    return getModEffectivenessScore(b) - getModEffectivenessScore(a);
+  });
+  return valid[0];
+}
 
 export function evaluateModImpactInPack(
   mod: ModItem,
   selectedSet: Set<string>,
   analysisInput?: ReturnType<typeof analyzeSelection>,
-  prefs?: AssemblyPreferences,
-  skipBetterAnalog = false,
-  precomputedBaseMetrics?: PackScoreResult
+  prefs?: AssemblyPreferences
 ): ContextualModImpact {
   const inPack = selectedSet.has(mod.id);
   const withoutIds = Array.from(selectedSet).filter(id => id !== mod.id);
@@ -4189,11 +4060,18 @@ export function evaluateModImpactInPack(
 
   // Memory stack synergy
   if (mod.id === 'modernfix') {
-    addSynergy(['ferritecore', 'saturn', 'alltheleaks-memory-leak-fix', 'jasione'], 'В связке с FerriteCore / Saturn / AllTheLeaks снижает RAM на 35–50% и закрывает утечки памяти', 180);
+    addSynergy(['ferritecore', 'alltheleaks-memory-leak-fix', 'jasione'], 'В связке с FerriteCore / AllTheLeaks снижает RAM на 35–50% и закрывает утечки памяти', 180);
   } else if (mod.id === 'ferritecore') {
-    addSynergy(['modernfix', 'saturn', 'alltheleaks-memory-leak-fix'], 'Вместе с ModernFix даёт максимальную экономию ОЗУ на моделях и блоках', 150);
-  } else if (mod.id === 'saturn' || mod.id === 'alltheleaks-memory-leak-fix' || mod.id === 'jasione' || mod.id === 'duplicate-nbt-flattener' || mod.id === 'log-begone') {
-    addSynergy(['modernfix', 'ferritecore'], 'Закрывает утечки, спам логов и аллокации памяти поверх ядра ModernFix', 120);
+    addSynergy(['modernfix', 'alltheleaks-memory-leak-fix'], 'Вместе с ModernFix даёт максимальную экономию ОЗУ на моделях и блоках', 150);
+  } else if (mod.id === 'capability-fix-revived') {
+    addSynergy(['modernfix', 'alltheleaks-memory-leak-fix'], 'Срезает лишние аллокации и утечки Forge Capabilities при частых тиках механизмов и мобов', 110);
+  } else if (
+    mod.id === 'alltheleaks-memory-leak-fix' ||
+    mod.id === 'jasione' ||
+    mod.id === 'duplicate-nbt-flattener' ||
+    mod.id === 'put-a-plug-in-it-papi'
+  ) {
+    addSynergy(['modernfix', 'ferritecore'], 'Закрывает утечки кэша (ModelManager/ItemStackKey) и Enum/NBT-аллокации поверх ядра ModernFix', 120);
   } else if (mod.id === 'calm-the-leaks') {
     addSynergy(['alltheleaks-memory-leak-fix', 'spark'], 'Фильтрует отчёты утечек AllTheLeaks и связывает тренды со spark', 90);
   }
@@ -4202,7 +4080,7 @@ export function evaluateModImpactInPack(
   if (mod.id === 'embeddium' || mod.id === 'emberbium') {
     addSynergy(['flerovium', 'immediatelyfast', 'kerria', 'sodium-chloride'], 'Аддоны дополняют рендер чанков: предметы/частицы, HUD/GUI и кэш анимаций текстур GPU', 160);
     if (mod.id === 'emberbium' && withoutSet.has('nvidium')) {
-      addSynergy(['nvidium'], 'Radix-сортировка Emberbium + NVIDIA Mesh Shaders Nvidium дают потолок FPS без шейдеров', 220);
+      addSynergy(['nvidium'], 'Radix-сортировка Emberbium + NVIDIA Mesh Shaders Nvidium дают потолок FPS без шейдеров (через .connector)', 220);
     }
   } else if (mod.id === 'flerovium') {
     addSynergy(['embeddium', 'emberbium'], 'Ускоряет рендер предметов (+50%), частиц (+50%) и сущностей (+30%), не дублируя рендерер чанков', 160);
@@ -4210,12 +4088,14 @@ export function evaluateModImpactInPack(
     addSynergy(['embeddium', 'emberbium', 'kerria'], 'Закрывает Immediate-Mode (текст, HUD, 2D-частицы, GUI) поверх рендера чанков и кэша текстур', 140);
   } else if (mod.id === 'kerria') {
     addSynergy(['embeddium', 'emberbium', 'immediatelyfast'], 'Кэширует неинтерполированные анимации текстур на GPU (огонь, вода, порталы), убирая фризы glTexSubImage2D', 150);
+  } else if (mod.id === 'gputape') {
+    addSynergy(['emberbium', 'embeddium', 'nvidium', 'alloyium'], 'Очищает устаревшие GPU/OpenGL-буферы и страхует от переполнения 4 ГБ VRAM при смене миров и пролётах', 110);
   } else if (mod.id === 'shadowlod' && (withoutSet.has('oculus') || withoutSet.has('emberlens'))) {
     addSynergy(['oculus', 'emberlens', 'faster-iris-shadow-mapper'], 'Снижает стоимость далёких проходов теней в шейдерах без заметной потери детализации вблизи', 130);
   } else if (mod.id === 'nvidium') {
     addSynergy(['embeddium', 'emberbium'], 'Разгружает геометрию далёких чанков в Mesh Shaders NVIDIA GTX 16xx/RTX (+3×–10× FPS без шейдеров)', 240);
   } else if (mod.id === 'alloyium') {
-    addSynergy(['embeddium'], 'Ускоряет видимость чанков на GPU через OpenGL Compute; полностью совместим с Oculus', 130);
+    addSynergy(['embeddium'], 'Ускоряет видимость чанков на GPU через OpenGL Compute; полностью совместим с Oculus и работает без Sinytra', 130);
   } else if (mod.id === 'accelerated-rendering') {
     if (hasRenderCore) {
       interactions.push({
@@ -4238,39 +4118,25 @@ export function evaluateModImpactInPack(
     addOverlap(['sodium-embeddium-dynamic-lights'], 'Динамический свет дублируется отдельным модом Sodium/Embeddium Dynamic Lights', -40);
   }
 
-  // Culling 5-layer compatibility & overlap checks
+  // Culling 3-layer synergy
   if (mod.id === 'entity-culling') {
-    addSynergy(['culllessleaves-reforged', 'enhanced-block-entities-reloaded', 'fast-item-frames', 'flerovium'], 'Чистый многослойный куллинг без наложений: сущности за стенами + листва + сундуки/рамки + рендер предметов', 140);
-    addOverlap(['itemculler'], 'Entity Culling уже асинхронно отсекает выброшенные предметы за стенами — ItemCuller дублирует задачу', -40);
-    if (prefs?.useCreate || withoutSet.has('flywheel') || withoutSet.has('vanillin')) {
-      interactions.push({
-        kind: 'context',
-        targetIds: [],
-        targetNames: [],
-        summary: 'Для Create добавьте контрапшены (create:contraption) в whitelist config/entityculling.json во избежание мерцания ветряков',
-        impactDelta: 0,
-      });
-    }
+    addSynergy(['culllessleaves-reforged', 'enhanced-block-entities-reloaded', 'more-culling-reforged'], 'Трёхслойный куллинг: сущности за стенами + невидимые грани/рамки + запечённые сундуки', 140);
+  } else if (mod.id === 'enhanced-block-entities-reloaded') {
+    addSynergy(['matlib', 'entity-culling', 'fast-item-frames'], 'Запекает сундуки, таблички и кровати в статические чанки (через MatLib), разгружая Entity Culling и рамки', 120);
   } else if (mod.id === 'more-culling-reforged') {
-    addSynergy(['entity-culling', 'enhanced-block-entities-reloaded'], 'Дополняет Entity Culling и запечённые модели EBER отсечением скрытых граней блоков и текста табличек', 90);
-    addOverlap(['culllessleaves-reforged'], 'При наличии CullLessLeaves Reforged отключите leavesCullingMode в config/moreculling.toml', -60);
-    addOverlap(['fast-item-frames'], 'Fast Item Frames уже превращает рамки в блоки — отключите itemFrameCulling в config/moreculling.toml', -80);
-    addOverlap(['clab'], 'CLab содержит встроенный куллинг листвы и пересекается с More Culling', -80);
+    addSynergy(['entity-culling'], 'Дополняет Entity Culling отсечением невидимых граней блоков и рамок', 90);
+    addOverlap(['culllessleaves-reforged'], 'При наличии CullLessLeaves Reforged оставьте куллинг листвы за ним (в More Culling отключите листву)', -60);
   } else if (mod.id === 'fast-item-frames') {
-    addSynergy(['enhanced-block-entities-reloaded', 'entity-culling', 'flerovium'], 'Превращает тяжёлые рамки в блоки; идеально сочетается с EBER, Entity Culling и Flerovium', 100);
-    addOverlap(['more-culling-reforged'], 'Пересекается с item-frame куллингом More Culling Reforged — отключите куллинг рамок в moreculling.toml', -45);
-  } else if (mod.id === 'itemculler') {
-    addOverlap(['entity-culling'], 'Частично перекрыт Entity Culling (он уже отсекает скрытый дроп за стенами)', -90);
-    addSynergy(['flerovium'], 'Дополняет LOD-рендеринг предметов Flerovium (но уступает универсальности Entity Culling)', 40);
-  } else if (mod.id === 'clab') {
-    addOverlap(['culllessleaves-reforged', 'more-culling-reforged', 'leaves-culling', 'sodium-leaf-culling-unofficial', 'sodium-embeddium-leaf-culling'], 'CLab содержит встроенный куллинг листвы и перекрывается с внешними модами на листву', -90);
-  } else if (mod.id === 'sodium-sightline' && (withoutSet.has('oculus') || withoutSet.has('emberlens') || prefs?.useShaders)) {
-    addOverlap(['oculus', 'emberlens'], 'Отсечение чанков за спиной игрока ломает проходы направленных теней в шейдерах Oculus/Emberlens', -130);
+    addSynergy(['enhanced-block-entities-reloaded'], 'Дополняет EBER оптимизацией настенных рамок на складах', 80);
   }
 
   // TPS / Farm / Create / GeckoLib synergy
   if (mod.id === 'radium-re-reforged') {
     addSynergy(['immersive-optimization', 'clumps', 'badoptimizations', 'falling-blocks-fps-fix'], 'Связка для TPS: физика Lithium + троттлинг ИИ мобов + объединение опыта + оптимизация сыпучих блоков', 160);
+  } else if (mod.id === 'badoptimizations') {
+    addSynergy(['radium-re-reforged', 'fastvancements'], 'Кэширует свет, цвет неба, тосты и мелкие клиентские циклы, дополняя физику Radium и Fastvancements', 110);
+  } else if (mod.id === 'clumps') {
+    addSynergy(['let-me-despawn', 'radium-re-reforged'], 'Сливает сферы опыта в один орб на фермах мобов, дополняя безопасный деспавн Let Me Despawn и TPS-патчи Radium', 100);
   } else if (mod.id === 'falling-blocks-fps-fix') {
     addSynergy(['radium-re-reforged', 'entity-culling'], 'Предотвращает просадки FPS и TPS при одновременном обвале песка и гравия', 120);
   } else if (mod.id === 'immersive-optimization') {
@@ -4295,54 +4161,73 @@ export function evaluateModImpactInPack(
     addSynergy(['noisiumed', 'lightstar'], 'Многопоточный свет Solix + Noisiumed ускоряют генерацию и прогрузку чанков', 120);
   } else if (mod.id === 'lightstar') {
     addSynergy(['embeddium', 'emberbium'], 'Клиентский кэш света в Embeddium/Emberbium; безопасен даже в паре с Solix', 90);
+  } else if (mod.id === 'sodium-embeddium-options-api') {
+    addSynergy(['emberbium', 'embeddium', 'sodium-embeddium-dynamic-lights'], 'Связывает меню видео-настроек Emberbium/Embeddium с Sodium Dynamic Lights через общий OptionGUIConstructionEvent', 80);
+  } else if (mod.id === 'sodium-embeddium-dynamic-lights') {
+    addSynergy(['sodium-embeddium-options-api', 'emberbium', 'embeddium'], 'Добавляет динамический свет факелов/дропа поверх Emberbium/Embeddium и Options API без дублирования Chloride', 100);
   } else if (mod.id === 'fastload') {
     addSynergy(['ksyxis', 'modernfix'], 'Ускоряет загрузку первых чанков мира в паре с Ksyxis и ModernFix', 100);
   } else if (mod.id === 'ksyxis') {
     addSynergy(['fastload', 'modernfix'], 'Убирает прогрев спавна (в паре с Fastload даёт мгновенный вход; осторожно с автофермами на спавне)', 70);
   }
 
-  // CPU input & audio & LOD & recipes
+  // CPU input & audio & LOD & recipes & QoL
   if (mod.id === 'ixeris' && (withoutSet.has('stutterfix-reforged') || withoutSet.has('threadtweak-reforged'))) {
     addSynergy(['stutterfix-reforged', 'threadtweak-reforged'], 'Убирает статтеры ввода мыши и выравнивает фреймтайм потоков CPU', 110);
   }
   if (mod.id === 'threadtweak-reforged' && withoutSet.has('stutterfix-reforged')) {
     addSynergy(['stutterfix-reforged'], 'Приоритезация потоков дополняет контроль кадров StutterFix', 85);
-  } else if (mod.id === 'stutterfix-reforged' && withoutSet.has('threadtweak-reforged')) {
-    addSynergy(['threadtweak-reforged'], 'Согласует кадр с распределением потоков ThreadTweak', 85);
+  } else if (mod.id === 'stutterfix-reforged' && (withoutSet.has('threadtweak-reforged') || withoutSet.has('ixeris'))) {
+    addSynergy(['ixeris', 'threadtweak-reforged'], 'Согласует кадр с асинхронным вводом Ixeris и распределением потоков CPU', 95);
   }
-  if (mod.id === 'packet-fixer' && (withoutSet.has('connectivity') || withoutSet.has('krypton-reno'))) {
-    addSynergy(['connectivity', 'krypton-reno'], 'Укрепляет сетевой стек и лимиты пакетов/NBT в тяжёлых Forge-сборках', 90);
+  if (mod.id === 'packet-fixer') {
+    addSynergy(['connectivity', 'krypton-reno', 'modernfix'], 'Снимает лимиты размера NBT и сетевых пакетов Forge 1.20.1, предотвращая краши больших предметов и чанков даже в сингле', 90);
   }
-  if (mod.id === 'iris-flywheel-compat') {
-    addSynergy(['oculus', 'flywheel'], 'Возвращает аппаратный GPU-инстансинг Create (Flywheel) при включённых шейдерах Oculus', 180);
+  if (mod.id === 'fastvancements') {
+    addSynergy(['badoptimizations', 'modernfix'], 'Кэширует проверки дерева достижений без фризов при подборе лута и открытии рецептов', 85);
   }
-  if (mod.id === 'dynamic-fps' && (withoutSet.has('restmode') || withoutSet.has('idle-boost') || withoutSet.has('fps-reducer'))) {
-    addOverlap(['restmode', 'idle-boost', 'fps-reducer'], 'Оба ограничивают FPS в фоне/простое — оставьте один Dynamic FPS', -70);
-  } else if ((mod.id === 'restmode' || mod.id === 'idle-boost' || mod.id === 'fps-reducer') && withoutSet.has('dynamic-fps')) {
+  if (mod.id === 'dynamic-fps' && (withoutSet.has('restmode') || withoutSet.has('idle-boost'))) {
+    addOverlap(['restmode', 'idle-boost'], 'Оба ограничивают FPS в фоне/простое — оставьте один Dynamic FPS', -70);
+  } else if ((mod.id === 'restmode' || mod.id === 'idle-boost') && withoutSet.has('dynamic-fps')) {
     addOverlap(['dynamic-fps'], 'Перекрывается Dynamic FPS — достаточно одного мода для фонового режима', -90);
   }
-  if (mod.id === 'ryoamiclights' && withoutSet.has('sodium-embeddium-dynamic-lights')) {
-    addOverlap(['sodium-embeddium-dynamic-lights'], 'Оба реализуют динамическое освещение — оставьте только RyoamicLights', -70);
-  } else if (mod.id === 'sodium-embeddium-dynamic-lights' && withoutSet.has('ryoamiclights')) {
-    addOverlap(['ryoamiclights'], 'Перекрывается более лёгким RyoamicLights', -90);
-  }
-  if (mod.id === 'get-it-together-drops' && withoutSet.has('itemmerge')) {
-    addOverlap(['itemmerge'], 'Get It Together, Drops! перекрывает ItemMerge — оставьте только один мод на дроп', -40);
-  } else if (mod.id === 'itemmerge' && withoutSet.has('get-it-together-drops')) {
-    addOverlap(['get-it-together-drops'], 'Перекрывается более современным Get It Together, Drops!', -90);
-  }
-  if (mod.id === 'particle-core' && withoutSet.has('particull')) {
-    addOverlap(['particull'], 'Particle Core уже покрывает отсечение и батчинг частиц — Particull лишний', -50);
+  if (mod.id === 'particle-core') {
+    addSynergy(['flerovium', 'fzzy-config'], 'Отсекает и батчит невидимые частицы до рендера, усиливая GPU-пайплайн Flerovium (настраивается через Fzzy Config)', 90);
+    if (withoutSet.has('particull')) {
+      addOverlap(['particull'], 'Particle Core уже покрывает отсечение и батчинг частиц — Particull лишний', -50);
+    }
   } else if (mod.id === 'particull' && withoutSet.has('particle-core')) {
-    addOverlap(['particle-core'], 'Частично перекрыт более комплексным Particle Core', -80);
+    addOverlap(['particle-core'], 'Перекрыт более комплексным Particle Core', -80);
   }
   if (mod.id === 'accelerated-rendering' && withoutSet.has('flerovium')) {
     addSynergy(['flerovium'], 'Совместно ускоряют толпы мобов (Compute) и предметы/частицы (Flerovium), если хватает VRAM', 60);
   }
   if (mod.id === 'fast-sounds') {
-    addSynergy(['soundgc', 'reload-looping-sound-fix', 'thulium'], 'Кэш OpenAL + очистка буферов (SoundGC / Reload Looping Sound Fix / Thulium) без дублирования', 100);
-  } else if (mod.id === 'soundgc' || mod.id === 'reload-looping-sound-fix' || mod.id === 'thulium') {
+    addSynergy(['soundgc', 'thulium'], 'Кэш OpenAL + очистка буферов (SoundGC / Thulium) без дублирования', 100);
+    addSynergy(['reload-looping-sound-fix'], 'Сохраняет зацикленные звуки после F3+T (MC-194284)', 60);
+  } else if (mod.id === 'soundgc' || mod.id === 'thulium') {
     addSynergy(['fast-sounds'], 'Дополняет Fast Sounds очисткой/оптимизацией буферов OpenAL и GC аудио-потока', 80);
+  } else if (mod.id === 'reload-looping-sound-fix') {
+    addSynergy(['fast-sounds'], 'Дополняет Fast Sounds исправлением обрыва зацикленных звуков при F3+T (MC-194284)', 80);
+  }
+  if (mod.id === 'configured') {
+    addSynergy(['cloth-config-v12', 'fzzy-config'], 'Позволяет редактировать конфиги модов прямо в меню Mods без перезапуска, дополняя Cloth Config и Fzzy Config', 40);
+  }
+  if (mod.id === 'controlling') {
+    addSynergy(['searchables'], 'Работает поверх Searchables для быстрого поиска и фильтра конфликтов клавиш в большой сборке', 40);
+  }
+  if (mod.id === 'sinytra-connector' && withoutSet.has('nvidium')) {
+    addSynergy(['nvidium', 'forgified-fabric-api', 'connector-extras'], 'Обеспечивает запуск Fabric-версии Nvidium на Forge (при старте автоматически создаёт кэш-папку .connector)', 120);
+  }
+  if (mod.id === 'compact-f3-plus' && hasRenderCore) {
+    const coreTargets = ['emberbium', 'embeddium', 'nvidium', 'alloyium'].filter(id => withoutSet.has(id));
+    interactions.push({
+      kind: 'context',
+      targetIds: coreTargets,
+      targetNames: coreTargets.map(id => MOD_BY_ID.get(id)?.name || id),
+      summary: 'Убирает информационный шум экрана F3 (показывает чистые FPS, VRAM/RAM и статус рендерера при отладке сборки)',
+      impactDelta: 0,
+    });
   }
   if (mod.id === 'advanced-loot-info-ali' && withoutSet.has('fastali')) {
     addSynergy(['fastali'], 'FastALI полностью убирает 10–20 сек. зависание ALI при входе в мир', 120);
@@ -4362,20 +4247,225 @@ export function evaluateModImpactInPack(
   if (mod.id === 'distant-horizons' && (withoutSet.has('oculus') || withoutSet.has('emberlens')) && withoutSet.has('distant-horizons-memory-fix-dh')) {
     addSynergy(['distant-horizons-memory-fix-dh'], 'DH Memory Fix страхует утечки памяти при работе LOD вместе с шейдерами', 100);
   }
+  if (mod.id === 'distant-horizons') {
+    addOverlap(['bobby-reforged', 'farsight'], 'Distant Horizons заменяет локальный кэш чанков Bobby/Farsight собственным LOD-движком', -40);
+    if (
+      withoutSet.has('concurrent-chunk-management-engine-forge-c2me') ||
+      withoutSet.has('c2me-concurrent-chunk-management-engine') ||
+      withoutSet.has('c2mer')
+    ) {
+      interactions.push({
+        kind: 'context',
+        targetIds: ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer'].filter(id => withoutSet.has(id)),
+        targetNames: ['C2ME'],
+        summary: 'Одновременная генерация LOD Distant Horizons и многопоточных чанков C2ME насыщает все потоки CPU — снизьте numberOfThreads / CPU Load в config/DistantHorizons.toml',
+        impactDelta: 0,
+      });
+    }
+  } else if ((mod.id === 'bobby-reforged' || mod.id === 'farsight') && withoutSet.has('distant-horizons')) {
+    addOverlap(['distant-horizons'], 'Перекрыт Distant Horizons: для дальнего обзора достаточно одного DH', -140);
+  }
+
+  if (mod.id === 'prismanium') {
+    addOverlap(['sodium-embeddium-dynamic-lights'], 'В Prismanium уже встроено динамическое освещение — отдельный Sodium/Embeddium Dynamic Lights лишний', -80);
+    if (withoutSet.has('sodium-chloride')) {
+      interactions.push({
+        kind: 'context',
+        targetIds: ['sodium-chloride'],
+        targetNames: ['(Sodium) Chloride'],
+        summary: 'Отключите динамический свет либо в Prismanium, либо в config/chloride-client.toml во избежание дублирования',
+        impactDelta: 0,
+      });
+    }
+  } else if (mod.id === 'sodium-embeddium-dynamic-lights' && withoutSet.has('prismanium')) {
+    addOverlap(['prismanium'], 'Встроенный динамический свет Prismanium дублирует этот мод', -90);
+  }
+
+  if ((mod.id === 'flywheel' || mod.id === 'vanillin') && (withoutSet.has('oculus') || withoutSet.has('emberlens'))) {
+    const shaderTargets = ['oculus', 'emberlens'].filter(id => withoutSet.has(id));
+    interactions.push({
+      kind: 'context',
+      targetIds: shaderTargets,
+      targetNames: shaderTargets.map(id => MOD_BY_ID.get(id)?.name || id),
+      summary: 'С шейдерами Oculus/Emberlens GPU-инстансинг Flywheel 1.0 отключается без моста совместимости (Iris & Oculus Flywheel Compat / Colorwheel) — возможен откат на CPU-рендер механизмов Create',
+      impactDelta: 0,
+    });
+  }
+
+  if (mod.id === 'gputape' && (withoutSet.has('oculus') || withoutSet.has('emberlens'))) {
+    const shaderTargets = ['oculus', 'emberlens'].filter(id => withoutSet.has(id));
+    interactions.push({
+      kind: 'context',
+      targetIds: shaderTargets,
+      targetNames: shaderTargets.map(id => MOD_BY_ID.get(id)?.name || id),
+      summary: 'Важно при игре с шейдерами: держите useRboDepth = false в config/gputape.toml, иначе RBO depth сломает глубину кадра шейдерпаков',
+      impactDelta: 0,
+    });
+  }
+
+  if (mod.id === 'immediatelyfast' && (withoutSet.has('oculus') || withoutSet.has('emberlens'))) {
+    const shaderTargets = ['oculus', 'emberlens'].filter(id => withoutSet.has(id));
+    interactions.push({
+      kind: 'context',
+      targetIds: shaderTargets,
+      targetNames: shaderTargets.map(id => MOD_BY_ID.get(id)?.name || id),
+      summary: 'Если с шейдерами мерцают HUD, таблички или зачарования, отключите hud_batching / experimental_sign_text_buffering в config/immediatelyfast.json',
+      impactDelta: 0,
+    });
+  }
+
+  if (mod.id === 'servercore' && (withoutSet.has('adaptive-performance-tweaks') || withoutSet.has('adaptive-optimization-reborn'))) {
+    addOverlap(['adaptive-performance-tweaks', 'adaptive-optimization-reborn'], 'Двойное адаптивное ограничение ИИ и дистанции тиков — достаточно одного ServerCore', -60);
+  } else if ((mod.id === 'adaptive-performance-tweaks' || mod.id === 'adaptive-optimization-reborn') && withoutSet.has('servercore')) {
+    addOverlap(['servercore'], 'Перекрывается ServerCore: одновременный троттлинг мобов и view-distance излишен', -110);
+  }
+
+  if (mod.id === 'mob-collision-off' && (withoutSet.has('farmcollisionless') || withoutSet.has('entity-collision-optimization'))) {
+    addOverlap(['farmcollisionless', 'entity-collision-optimization'], 'Mob Collision Off полностью отключает коллизии мобов, делая остальные фиксы столкновений лишними', -50);
+  } else if ((mod.id === 'farmcollisionless' || mod.id === 'entity-collision-optimization') && withoutSet.has('mob-collision-off')) {
+    addOverlap(['mob-collision-off'], 'Перекрыт Mob Collision Off: когда коллизии полностью отключены, оптимизация выталкивания не нужна', -120);
+  } else if (mod.id === 'entity-collision-optimization' && withoutSet.has('radium-re-reforged')) {
+    interactions.push({
+      kind: 'context',
+      targetIds: ['radium-re-reforged'],
+      targetNames: ['Radium Re-Reforged'],
+      summary: 'Значительная часть оптимизаций коллизий уже есть в Radium Re-Reforged — отдельный мод полезен лишь для экстремально плотных ферм мобов',
+      impactDelta: 0,
+    });
+  }
+
+  if (mod.id === 'alternate-current' && withoutSet.has('radium-re-reforged')) {
+    interactions.push({
+      kind: 'context',
+      targetIds: ['radium-re-reforged'],
+      targetNames: ['Radium Re-Reforged'],
+      summary: 'Перекрывает редстоун-модуль Radium более быстрым графом; при отладке редких ванильных 0-tick схем можно отключить redstone в config/radium.properties',
+      impactDelta: 0,
+    });
+  }
+
+  if (mod.id === 'falling-blocks-fps-fix' && prefs?.useCreate) {
+    interactions.push({
+      kind: 'context',
+      targetIds: [],
+      targetNames: [],
+      summary: 'В Create-сборках с крупными бурами/карьерами гравия и песка следите за порогом удаления падающих блоков, чтобы не терять лишние сущности',
+      impactDelta: 0,
+    });
+  }
+
+  if (mod.id === 'particle-core' && withoutSet.has('asyncparticles')) {
+    addOverlap(['asyncparticles'], 'Particle Core уже берёт на себя отсечение и оптимизацию частиц — AsyncParticles дублирует работу и повышает риск мерцания в Botania', -60);
+  } else if (mod.id === 'asyncparticles' && withoutSet.has('particle-core')) {
+    addOverlap(['particle-core'], 'Перекрывается Particle Core: одновременный многопоточный тикинг и куллинг частиц создаёт риск артефактов', -120);
+  }
+
+  if (mod.id === 'immersive-optimization') {
+    addOverlap(['entitysleep', 'enttick', 'sleepium', 'martensite-entity-tick-skiper'], 'Immersive Optimization уже адаптивно замедляет тики дальних мобов без сторонних скипперов', -50);
+  } else if (['entitysleep', 'enttick', 'sleepium', 'martensite-entity-tick-skiper'].includes(mod.id) && withoutSet.has('immersive-optimization')) {
+    addOverlap(['immersive-optimization'], 'Перекрыт Immersive Optimization: дополнительный пропуск тиков сущностей не требуется', -120);
+  }
+
+  const withoutHasAnyC2ME =
+    withoutSet.has('concurrent-chunk-management-engine-forge-c2me') ||
+    withoutSet.has('c2me-concurrent-chunk-management-engine') ||
+    withoutSet.has('c2mer');
+  if (mod.id === 'delta-chunk' && (withoutHasAnyC2ME || withoutSet.has('parallel-world-save'))) {
+    addOverlap(
+      withoutHasAnyC2ME
+        ? ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer']
+        : ['parallel-world-save'],
+      'Конкуренция перехватчиков записи чанков на диск — оставьте основной асинхронный движок без Delta Chunk',
+      -120
+    );
+  } else if (mod.id === 'parallel-world-save' && (withoutHasAnyC2ME || withoutSet.has('delta-chunk'))) {
+    addOverlap(
+      withoutHasAnyC2ME
+        ? ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer']
+        : ['delta-chunk'],
+      'Пересечение асинхронного сохранения мира с C2ME / Delta Chunk на уровне записи регионов чанков',
+      -90
+    );
+  }
+
+  if (mod.id === 'resourcepackcached' && (withoutSet.has('keep-the-resourcepack') || withoutSet.has('packforge'))) {
+    addOverlap(['keep-the-resourcepack', 'packforge'], 'ResourcePackCached уже кэширует распакованные паки на диске — второй кэшер ресурс-паков лишний', -40);
+  } else if ((mod.id === 'keep-the-resourcepack' || mod.id === 'packforge') && withoutSet.has('resourcepackcached')) {
+    addOverlap(['resourcepackcached'], 'Перекрыт ResourcePackCached: дублирование кэша ZIP ресурс-паков при запуске', -100);
+  } else if (mod.id === 'keep-the-resourcepack' && withoutSet.has('packforge')) {
+    addOverlap(['packforge'], 'Пересекается с PackForge на этапе распаковки текстурпаков (оставьте один, лучше ResourcePackCached)', -60);
+  } else if (mod.id === 'packforge' && withoutSet.has('keep-the-resourcepack')) {
+    addOverlap(['keep-the-resourcepack'], 'Пересекается с Keep The ResourcePack на этапе распаковки текстурпаков (оставьте один)', -90);
+  }
+
+  if (mod.id === 'zstdnet') {
+    interactions.push({
+      kind: 'context',
+      targetIds: [],
+      targetNames: [],
+      summary: 'Протокольный нюанс: ZSTDNET обязан стоять и на сервере, и у каждого клиента (несовместим с ванильным входом и встроенным Zstd в Krypton Hybrid)',
+      impactDelta: -30,
+    });
+  }
+
+  if (mod.id === 'chunky') {
+    if (withoutHasAnyC2ME) {
+      addSynergy(
+        ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer'],
+        'В паре с C2ME многопоточно ускоряет команду /chunky start при предгенерации карты',
+        110
+      );
+    }
+    if (withoutSet.has('distant-horizons')) {
+      interactions.push({
+        kind: 'context',
+        targetIds: ['distant-horizons'],
+        targetNames: ['Distant Horizons'],
+        summary: 'На время предгенерации /chunky start отключайте фоновую генерацию LOD Distant Horizons, чтобы не делить потоки CPU и I/O диска',
+        impactDelta: 0,
+      });
+    }
+  }
+
+  if (mod.id === 'entity-culling' && (prefs?.useCreate || withoutSet.has('oculus') || withoutSet.has('emberlens'))) {
+    interactions.push({
+      kind: 'context',
+      targetIds: ['oculus', 'emberlens'].filter(id => withoutSet.has(id)),
+      targetNames: ['oculus', 'emberlens'].filter(id => withoutSet.has(id)).map(id => MOD_BY_ID.get(id)?.name || id),
+      summary: 'При мерцании крупных механизмов Create, терминалов хранения или теней за углом внесите их блок-сущности в blockEntityWhitelist (config/entityculling.json)',
+      impactDelta: 0,
+    });
+  }
+
+  if (mod.id === 'badoptimizations' && (withoutSet.has('oculus') || withoutSet.has('emberlens') || prefs?.useShaders)) {
+    interactions.push({
+      kind: 'context',
+      targetIds: ['oculus', 'emberlens'].filter(id => withoutSet.has(id)),
+      targetNames: ['oculus', 'emberlens'].filter(id => withoutSet.has(id)).map(id => MOD_BY_ID.get(id)?.name || id),
+      summary: 'Если шейдеры или моды на погоду меняют цвет неба рывками, установите enable_sky_color_caching=false в config/badoptimizations.txt',
+      impactDelta: 0,
+    });
+  }
+
+  if (mod.id === 'let-me-despawn' && withoutSet.has('almanac')) {
+    interactions.push({
+      kind: 'context',
+      targetIds: ['almanac'],
+      targetNames: ['Almanac Lib'],
+      summary: 'Мобы с бирками защищены, а подобранные редкие предметы при деспавне выбрасываются на землю (редких боссов можно защитить в config/letmedespawn.json)',
+      impactDelta: 0,
+    });
+  }
 
   // Hardware / scenario caveats
   if (NETWORK_MULTIPLAYER_IDS.has(mod.id)) {
-    if (!prefs || prefs.mode === 'singleplayer') {
-      interactions.push({
-        kind: 'context',
-        targetIds: [],
-        targetNames: [],
-        summary: 'Импакт раскрывается на сервере / в онлайне; в лёгкой одиночной игре влияние околонулевое',
-        impactDelta: mod.id === 'krypton-reno' ? 0 : -40,
-      });
-    } else {
-      addSynergy(['connectivity', 'krypton-reno', 'krypton-hybrid', 'servercore'], 'Ускоряет сетевой обмен и подгрузку чанков на сервере', 80);
-    }
+    interactions.push({
+      kind: 'context',
+      targetIds: [],
+      targetNames: [],
+      summary: 'Импакт раскрывается на сервере / в онлайне; в лёгкой одиночной игре влияние околонулевое',
+      impactDelta: mod.id === 'krypton-reno' ? 0 : -40,
+    });
   } else if (CONTENT_FIX_IDS.has(mod.id)) {
     interactions.push({
       kind: 'context',
@@ -4390,7 +4480,9 @@ export function evaluateModImpactInPack(
       kind: 'context',
       targetIds: [],
       targetNames: [],
-      summary: 'Заметен при быстрой разведке карты / элитрах и 8+ ядрах CPU; на 4–6 потоках или слабой ОЗУ риск фризов',
+      summary: withoutSet.has('distant-horizons')
+        ? 'Заметен при быстрой разведке на 8+ ядрах CPU; в паре с Distant Horizons ограничьте потоки LOD, чтобы избежать статтеров'
+        : 'Заметен при быстрой разведке карты / элитрах и 8+ ядрах CPU; на 4–6 потоках или слабой ОЗУ риск фризов',
       impactDelta: 0,
     });
   } else if ((mod.id === 'geckolib-animation-optimizer' || mod.id === 'geckolibbetterfps') && !withoutSet.has('geckolib')) {
@@ -4441,7 +4533,15 @@ export function evaluateModImpactInPack(
     label = 'Перекрыт (0%)';
     summary = activeSup?.reason ? `Лишний: ${activeSup.reason}` : `Уже встроен в ${mod.coveredBy}`;
   } else if (isLibrary) {
-    if (activeLibConsumers.length > 0) {
+    if (mod.id === 'configured' || mod.id === 'controlling') {
+      level = 'support';
+      label = mod.id === 'configured' ? 'QoL-конфигуратор' : 'QoL-управление';
+      summary =
+        interactions[0]?.summary ||
+        (mod.id === 'configured'
+          ? 'Редактор конфигов модов прямо из меню Mods; сам FPS не повышает'
+          : 'Поиск и фильтр конфликтов клавиш в меню управления');
+    } else if (activeLibConsumers.length > 0) {
       level = 'support';
       label = 'Опора для модов';
       summary = `Сам FPS не повышает, но нужен для работы: ${activeLibConsumers.join(', ')}`;
@@ -4461,13 +4561,16 @@ export function evaluateModImpactInPack(
       mod.id === 'cupboard' ||
       mod.id === 'sodium-embeddium-options-api' ||
       mod.id === 'fzzy-config' ||
+      mod.id === 'puzzles-lib' ||
+      mod.id === 'almanac' ||
       mod.id === 'placebo' ||
-      mod.id === 'obsidianui' ||
-      mod.id === 'architectury-api'
+      mod.id === 'architectury-api' ||
+      mod.id === 'rinlib' ||
+      mod.id === 'searchables'
     ) {
       level = 'zero';
       label = 'Нет потребителя (0%)';
-      summary = 'В текущем списке нет оптимизатора, которому нужна эта библиотека';
+      summary = 'В текущем списке нет оптимизатора или QoL-мода, которому нужна эта библиотека';
     } else {
       level = 'support';
       label = 'Библиотека конфигов';
@@ -4494,13 +4597,7 @@ export function evaluateModImpactInPack(
     level = 'core';
     label = NETWORK_MULTIPLAYER_IDS.has(mod.id) ? 'Ядро (сеть)' : 'Ядро сборки';
     summary = interactions.find(i => i.kind === 'synergy')?.summary || mod.description;
-  } else if (
-    HIGH_SYNERGY_IDS.has(mod.id) ||
-    (mod.id === 'vanillin' && withoutSet.has('flywheel')) ||
-    (mod.id === 'flywheel' && withoutSet.has('vanillin')) ||
-    (mod.id === 'geckolibbetterfps' && withoutSet.has('geckolib')) ||
-    (NETWORK_MULTIPLAYER_IDS.has(mod.id) && (prefs?.mode === 'server' || prefs?.mode === 'hybrid-server') && mod.status === 'recommended')
-  ) {
+  } else if (HIGH_SYNERGY_IDS.has(mod.id) || (mod.id === 'vanillin' && withoutSet.has('flywheel')) || (mod.id === 'flywheel' && withoutSet.has('vanillin')) || (mod.id === 'geckolibbetterfps' && withoutSet.has('geckolib'))) {
     level = 'high';
     label = NETWORK_MULTIPLAYER_IDS.has(mod.id) ? 'Сильный (сервер)' : 'Сильный в связке';
     summary = interactions.find(i => i.kind === 'synergy')?.summary || mod.bestAlternative || mod.description;
@@ -4519,14 +4616,8 @@ export function evaluateModImpactInPack(
   }
 
   // Marginal relative % & normalized 0..100 points from floating-point pack delta
-  const metricsWithout =
-    !inPack && precomputedBaseMetrics
-      ? precomputedBaseMetrics
-      : computePackScoreInternal(withoutIds, withoutAnalysis, prefs);
-  const metricsWith =
-    inPack && precomputedBaseMetrics
-      ? precomputedBaseMetrics
-      : computePackScoreInternal(withIds, analysis, prefs);
+  const metricsWithout = computePackScoreInternal(withoutIds, withoutAnalysis, prefs);
+  const metricsWith = computePackScoreInternal(withIds, analysis, prefs);
   const rawGain = metricsWith.rawEffectiveScore - metricsWithout.rawEffectiveScore;
   const totalDelta = metricsWith.totalScore - metricsWithout.totalScore;
   let relativeImpactPct =
@@ -4592,16 +4683,11 @@ export function evaluateModImpactInPack(
   const candidateAnalog = getPreferredBetterAnalog(mod, withoutSet, prefs);
   const inExclusiveGroup = Boolean(mod.groupId && MOD_GROUPS.find(g => g.id === mod.groupId)?.exclusive);
   const inExclusivePool = findExclusivePoolPeers(mod.id).length > 0;
-  const hasExplicitSuperseder = Boolean(
-    (mod.supersededBy && mod.supersededBy.length > 0) ||
-    (mod.supersededWhenAll && mod.supersededWhenAll.length > 0)
-  );
   const allowMediumUpgrade =
-    hasExplicitSuperseder ||
-    inExclusivePool ||
-    (inExclusiveGroup && mod.id !== 'emberbium' && mod.status !== 'recommended');
+    (inExclusiveGroup || inExclusivePool) &&
+    mod.id !== 'emberbium' &&
+    mod.status !== 'recommended';
   if (
-    !skipBetterAnalog &&
     candidateAnalog &&
     (level === 'negative' ||
       level === 'zero' ||
@@ -4613,8 +4699,8 @@ export function evaluateModImpactInPack(
     const analogImpact =
       candidateAnalog.id === mod.id
         ? null
-        : computeQuickModPoints(candidateAnalog, withoutSet, withoutAnalysis, prefs, metricsWithout);
-    const minDelta = allowMediumUpgrade && level === 'medium' ? 12 : 5;
+        : computeQuickModPoints(candidateAnalog, withoutSet, withoutAnalysis, prefs);
+    const minDelta = allowMediumUpgrade && level === 'medium' ? 15 : 5;
     if (analogImpact !== null && analogImpact > impactPoints + minDelta) {
       betterAnalogId = candidateAnalog.id;
       betterAnalogName = candidateAnalog.name;
@@ -4646,18 +4732,15 @@ function computeQuickModPoints(
   mod: ModItem,
   baseSet: Set<string>,
   baseAnalysis: ReturnType<typeof analyzeSelection>,
-  prefs?: AssemblyPreferences,
-  baseMetrics?: PackScoreResult
+  prefs?: AssemblyPreferences
 ): number {
   const replacementSet = buildReplacementEvalSet(mod, baseSet, prefs);
   const useBase = replacementSet.size === baseSet.size && Array.from(replacementSet).every(id => baseSet.has(id));
   const res = evaluateModImpactInPack(
     mod,
     replacementSet,
-    useBase ? baseAnalysis : undefined,
-    prefs,
-    true,
-    useBase && !replacementSet.has(mod.id) ? baseMetrics : undefined
+    useBase && replacementSet.has(mod.id) ? baseAnalysis : undefined,
+    prefs
   );
   return res.impactPoints;
 }
@@ -4667,18 +4750,9 @@ export function getModAnalogsComparison(
   selectedSet: Set<string>,
   prefs?: AssemblyPreferences
 ): AnalogComparisonEntry[] {
-  const withoutIds = Array.from(selectedSet).filter(id => id !== mod.id);
-  const withoutSet = new Set(withoutIds);
-  const withoutAnalysis = analyzeSelection(withoutIds);
-  const withoutMetrics = computePackScoreInternal(withoutIds, withoutAnalysis, prefs);
-  const currentImpact = evaluateModImpactInPack(
-    mod,
-    selectedSet,
-    undefined,
-    prefs,
-    true,
-    selectedSet.has(mod.id) ? undefined : withoutMetrics
-  );
+  const withoutSet = new Set(Array.from(selectedSet).filter(id => id !== mod.id));
+  const withoutAnalysis = analyzeSelection(Array.from(withoutSet));
+  const currentImpact = evaluateModImpactInPack(mod, selectedSet, undefined, prefs);
 
   const peerIds = new Set<string>();
   if (mod.supersededBy) mod.supersededBy.forEach(id => peerIds.add(id));
@@ -4724,11 +4798,9 @@ export function getModAnalogsComparison(
 
   const conflictingWithMod = new Set(getRuleConflictingIds(mod.id));
   const grp = mod.groupId ? MOD_GROUPS.find(g => g.id === mod.groupId) : undefined;
-  const withModIds = Array.from(new Set([...withoutSet, mod.id]));
-  const withModSet = new Set(withModIds);
-  const withModAnalysis = analyzeSelection(withModIds);
-  const withModMetrics = computePackScoreInternal(withModIds, withModAnalysis, prefs);
-  const soloModWarningKeys = getSoloWarningKeys(mod.id);
+  const withModSet = new Set([...withoutSet, mod.id]);
+  const withModAnalysis = selectedSet.has(mod.id) ? undefined : analyzeSelection(Array.from(withModSet));
+  const soloModWarningKeys = new Set(analyzeSelection([mod.id]).warnings.map(w => `${w.modId}:${w.message}`));
 
   const entries: AnalogComparisonEntry[] = [];
   for (const pid of peerIds) {
@@ -4745,7 +4817,7 @@ export function getModAnalogsComparison(
     const isSwap = FABRIC_TO_FORGE_SWAP[mod.id] === alt.id || FABRIC_TO_FORGE_SWAP[alt.id] === mod.id;
 
     // Pairwise simulation to check joint compatibility cleanly (ignoring pre-existing solo missing-dep warnings on mod/alt individually)
-    const soloAltWarningKeys = getSoloWarningKeys(alt.id);
+    const soloAltWarningKeys = new Set(analyzeSelection([alt.id]).warnings.map(w => `${w.modId}:${w.message}`));
     const pairAnalysis = analyzeSelection([mod.id, alt.id]);
     const pairwiseWarnings = pairAnalysis.warnings.filter(
       w => !soloModWarningKeys.has(`${w.modId}:${w.message}`) && !soloAltWarningKeys.has(`${w.modId}:${w.message}`)
@@ -4821,29 +4893,15 @@ export function getModAnalogsComparison(
     // and evaluate mutually-exclusive replacements via buildReplacementEvalSet so active pack slot peers (e.g. Emberbium) don't distort Embeddium/Oculus comparisons.
     let evalSet: Set<string>;
     let evalAnalysis: ReturnType<typeof analyzeSelection> | undefined;
-    let evalBaseMetrics: PackScoreResult | undefined;
     if (canUseTogether) {
       const modNeedsAlt = getDirectDependencies(mod.id, withoutSet).includes(alt.id);
       evalSet = modNeedsAlt ? buildReplacementEvalSet(alt, withModSet, prefs) : withModSet;
-      if (evalSet === withModSet) {
-        evalAnalysis = withModAnalysis;
-        evalBaseMetrics = withModMetrics;
-      }
+      evalAnalysis = evalSet === withModSet ? withModAnalysis : undefined;
     } else {
       evalSet = buildReplacementEvalSet(alt, withoutSet, prefs);
-      if (evalSet === withoutSet || (evalSet.size === withoutSet.size && withoutIds.every(id => evalSet.has(id)))) {
-        evalAnalysis = withoutAnalysis;
-        evalBaseMetrics = withoutMetrics;
-      }
+      evalAnalysis = undefined;
     }
-    const altImpact = evaluateModImpactInPack(
-      alt,
-      evalSet,
-      evalAnalysis,
-      prefs,
-      true,
-      evalSet.has(alt.id) ? undefined : evalBaseMetrics
-    );
+    const altImpact = evaluateModImpactInPack(alt, evalSet, evalAnalysis, prefs);
     const points = altImpact.impactPoints;
     const relativeDeltaPoints = points - currentImpact.impactPoints;
     const marginalPct = altImpact.relativeImpactPct;

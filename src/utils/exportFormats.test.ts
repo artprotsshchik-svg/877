@@ -3,25 +3,31 @@ import assert from 'node:assert/strict';
 import {
   MRPACK_UNAVAILABLE_REASON,
   exportAssemblyAsCsv,
+  exportAssemblyAsJson,
   exportAssemblyAsTxt,
 } from './exportFormats.ts';
+import { estimateFpsRange } from './fpsEstimator.ts';
 import { INITIAL_BUILDER_PREFS, summarizeAssemblyImpact } from './modLogic.ts';
 import { decodeShareHash, encodeShareHash } from './persistence.ts';
 
-test('export formats (.txt, .csv) include multifactorial score without FPS/RAM forecast and document .mrpack reason', () => {
+test('export formats (.txt, .csv, .json) include valid assembly data and .mrpack unavailability reason is documented', () => {
   const ids = ['embeddium', 'modernfix', 'ferritecore'];
   const summary = summarizeAssemblyImpact(ids, undefined, INITIAL_BUILDER_PREFS);
+  const fps = estimateFpsRange(ids, summary, INITIAL_BUILDER_PREFS);
 
-  const txt = exportAssemblyAsTxt(ids, summary);
+  const txt = exportAssemblyAsTxt(ids, summary, fps);
   assert.match(txt, /Embeddium/);
   assert.match(txt, /ModernFix/);
-  assert.match(txt, /Оценка сборки/);
-  assert.doesNotMatch(txt, /Прогноз FPS/);
-  assert.doesNotMatch(txt, /Экономия ОЗУ/);
+  assert.match(txt, /оценка/);
 
   const csv = exportAssemblyAsCsv(ids, INITIAL_BUILDER_PREFS);
   assert.match(csv, /id,name,category,group,platform,status,impact_points,curseforge_url/);
   assert.match(csv, /embeddium/);
+
+  const json = JSON.parse(exportAssemblyAsJson(ids, summary, fps, INITIAL_BUILDER_PREFS));
+  assert.equal(json.minecraftVersion, '1.20.1');
+  assert.equal(json.loader, 'forge');
+  assert.equal(json.mods.length, 3);
   assert.match(MRPACK_UNAVAILABLE_REASON, /Modrinth/);
 });
 

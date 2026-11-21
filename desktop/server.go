@@ -14,7 +14,7 @@ import (
 	"strings"
 )
 
-const appVersion = "1.2.1"
+const appVersion = "1.2.0"
 
 type HotManifest struct {
 	UpdatedAt string `json:"updatedAt"`
@@ -290,7 +290,6 @@ func newDesktopHandler(distFS fs.FS, opts DesktopHandlerOptions) http.Handler {
 			return
 		}
 		if info, err := fs.Stat(distFS, cleanPath); err == nil && !info.IsDir() {
-			applyExplicitWebMimeType(w, cleanPath)
 			fileServer.ServeHTTP(w, r)
 			return
 		}
@@ -298,31 +297,4 @@ func newDesktopHandler(distFS fs.FS, opts DesktopHandlerOptions) http.Handler {
 	})
 
 	return mux
-}
-
-func applyExplicitWebMimeType(w http.ResponseWriter, cleanPath string) {
-	switch strings.ToLower(filepath.Ext(cleanPath)) {
-	case ".js", ".mjs":
-		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
-	case ".css":
-		w.Header().Set("Content-Type", "text/css; charset=utf-8")
-	case ".json":
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	case ".html", ".htm":
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	case ".svg":
-		w.Header().Set("Content-Type", "image/svg+xml")
-	case ".png":
-		w.Header().Set("Content-Type", "image/png")
-	case ".jpg", ".jpeg":
-		w.Header().Set("Content-Type", "image/jpeg")
-	case ".webp":
-		w.Header().Set("Content-Type", "image/webp")
-	case ".ico":
-		w.Header().Set("Content-Type", "image/x-icon")
-	case ".wasm":
-		w.Header().Set("Content-Type", "application/wasm")
-	case ".woff2":
-		w.Header().Set("Content-Type", "font/woff2")
-	}
 }

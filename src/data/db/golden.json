@@ -49,7 +49,7 @@
   },
   {
     "name": "Put A Plug In it!",
-    "role": "Глушит спам логов, спасая диск от зависаний"
+    "role": "Фикс утечек кэша (ModelManager/ItemStackKey) и команда /papi leak report"
   },
   {
     "name": "Radium Re-Reforged",

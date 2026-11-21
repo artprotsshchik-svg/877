@@ -47,6 +47,7 @@ export interface AssemblyPreferences {
   recipeViewer?: RecipeViewerChoice;
   packScale?: PackScale;
   goal: OptimizationGoal;
+  hideOutdatedUseless?: boolean;
   focusModId?: string | null;
 }
 
@@ -60,6 +61,7 @@ export const INITIAL_BUILDER_PREFS: AssemblyPreferences = {
   recipeViewer: 'jei',
   packScale: 'medium',
   goal: 'balanced',
+  hideOutdatedUseless: true,
   focusModId: null,
 };
 
@@ -191,8 +193,6 @@ export interface DubiousModEntry {
 export interface AssemblyScoreBreakdown {
   efficiencyScore: number;
   stabilityScore: number;
-  cleanlinessScore: number;
-  visualSafetyScore: number;
   coverageScore: number;
   synergyBonus: number;
   penaltyPoints: number;

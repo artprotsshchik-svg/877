@@ -61,7 +61,7 @@ export interface IncompatibilityRule {
   recommendation: string;
 }
 
-export type PresetCategory = 'nvidium' | 'max' | 'shaders' | 'create' | 'server' | 'potato' | 'demo';
+export type PresetCategory = 'nvidium' | 'max' | 'shaders' | 'server' | 'potato' | 'demo';
 
 export interface ModPreset {
   id: string;

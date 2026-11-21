@@ -25,6 +25,7 @@ import {
   type CheckerTier,
   type ModImpactLevel,
 } from '../utils/modLogic.ts';
+import { estimateFpsRange } from '../utils/fpsEstimator.ts';
 import {
   addMissingDependenciesForMod,
   applyWarningFix,
@@ -104,6 +105,10 @@ export function CheckerTab({ checkedModIds, setCheckedModIds, prefs, onOpenDetai
     () => summarizeAssemblyImpact(checkedModIds, analysis, effectivePrefs),
     [checkedModIds, analysis, effectivePrefs]
   );
+  const fpsEstimate = useMemo(
+    () => estimateFpsRange(checkedModIds, impactSummary, effectivePrefs),
+    [checkedModIds, impactSummary, effectivePrefs]
+  );
 
   const rows = useMemo(() => {
     return analysis.selectedMods
@@ -169,7 +174,10 @@ export function CheckerTab({ checkedModIds, setCheckedModIds, prefs, onOpenDetai
       if (!matches) return false;
       if (
         hideIncompatibleSuggestions &&
-        shouldHideMod(m, checkedSet, effectivePrefs, { hideIncompatible: true, hideUselessCovered: true })
+        shouldHideMod(m, checkedSet, effectivePrefs, {
+          hideIncompatible: true,
+          hideUselessCovered: effectivePrefs.hideOutdatedUseless !== false,
+        })
       ) {
         return false;
       }
@@ -384,6 +392,7 @@ export function CheckerTab({ checkedModIds, setCheckedModIds, prefs, onOpenDetai
             <ExportMenu
               modIds={checkedModIds}
               summary={impactSummary}
+              fpsEstimate={fpsEstimate}
               prefs={effectivePrefs}
               filenamePrefix="forge-1.20.1-checker"
             />
@@ -741,10 +750,8 @@ export function CheckerTab({ checkedModIds, setCheckedModIds, prefs, onOpenDetai
       {rows.length > 0 && (() => {
         const risk = impactSummary.artifactRisk;
         const sb = impactSummary.scoreBreakdown;
+        const rb = impactSummary.resourceBalance;
         const dubiousCount = impactSummary.dubiousMods.length;
-        const hasRiskyDubious = impactSummary.dubiousMods.some(
-          d => d.severity === 'high' || d.severity === 'medium'
-        );
         const riskTextCls =
           risk.level === 'critical'
             ? 'text-[#e55353]'
@@ -782,6 +789,22 @@ export function CheckerTab({ checkedModIds, setCheckedModIds, prefs, onOpenDetai
                   {showArtifactFactors ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                 </button>
 
+                <span
+                  className="text-[#8b9199] tabular-nums"
+                  title={fpsEstimate.note}
+                >
+                  Прогноз: <strong className={`font-mono ${fpsEstimate.hasConflicts ? 'text-[#e55353]' : 'text-[#3ddc84]'}`}>{fpsEstimate.label}</strong>
+                  <span className="text-[#2a2e33] mx-1">·</span>
+                  <strong className="text-[#e6e8ea] font-mono">{rb.ramDeltaLabel}</strong>
+                </span>
+
+                <span className="text-[#8b9199]">
+                  Подсистемы: <strong className="text-[#e6e8ea] font-mono font-semibold tabular-nums">{impactSummary.coveredSubsystems.length}/7</strong>
+                  {impactSummary.missingSubsystems.length > 0 && (
+                    <span className="text-[#e5a93c] ml-1.5">· нет: {impactSummary.missingSubsystems.slice(0, 2).join(', ')}</span>
+                  )}
+                </span>
+
                 <span className="text-[#8b9199]">
                   Синергии: <strong className="text-[#3ddc84] font-mono font-semibold tabular-nums">{impactSummary.synergies.length}</strong>
                 </span>
@@ -798,18 +821,16 @@ export function CheckerTab({ checkedModIds, setCheckedModIds, prefs, onOpenDetai
                 <button
                   type="button"
                   onClick={() => setShowDubiousModal(true)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-[4px] border text-xs font-semibold transition-colors duration-150 whitespace-nowrap tabular-nums ${
-                    hasRiskyDubious
-                      ? 'bg-[#e5a93c]/20 border-[#e5a93c]/70 text-[#f2bc52] hover:bg-[#e5a93c]/30'
-                      : dubiousCount > 0
-                        ? 'bg-[#5cb3ff]/15 border-[#5cb3ff]/65 text-[#6ec1ff] hover:bg-[#5cb3ff]/25'
-                        : 'bg-[#121417] border-[#2a2e33] text-[#8b9199] hover:text-[#e6e8ea]'
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] border text-xs font-semibold transition-colors duration-150 whitespace-nowrap tabular-nums ${
+                    impactSummary.dubiousMods.some(d => d.severity === 'high' || d.severity === 'medium')
+                      ? 'bg-[#e5a93c]/[0.08] border-[#e5a93c]/40 text-[#e5a93c]'
+                      : 'bg-[#121417] border-[#2a2e33] text-[#8b9199] hover:text-[#e6e8ea]'
                   }`}
                 >
                   <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
                   {dubiousCount === 0
-                    ? 'Нюансы (0)'
-                    : hasRiskyDubious
+                    ? 'Сомнительные моды (0)'
+                    : impactSummary.dubiousMods.some(d => d.severity === 'high' || d.severity === 'medium')
                       ? `Сомнительные моды (${dubiousCount})`
                       : `Нюансы (${dubiousCount})`}
                 </button>
@@ -819,14 +840,13 @@ export function CheckerTab({ checkedModIds, setCheckedModIds, prefs, onOpenDetai
             {showScoreBreakdown && (
               <div className="pt-2 border-t border-[#2a2e33] space-y-1.5 text-[11px] text-[#8b9199] tabular-nums">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span>Эффективность (38%): <strong className="text-[#3ddc84] font-mono">{sb.efficiencyScore}/100</strong></span>
-                  <span>Стабильность (30%): <strong className="text-[#3ddc84] font-mono">{sb.stabilityScore}/100</strong></span>
-                  <span>Чистота связки (18%): <strong className="text-[#e6e8ea] font-mono">{sb.cleanlinessScore}/100</strong></span>
-                  <span>Визуал (14%): <strong className="text-[#e6e8ea] font-mono">{sb.visualSafetyScore}/100</strong></span>
+                  <span>Эффективность (покрытие 7 подсистем + синергии): <strong className="text-[#e6e8ea] font-mono">{sb.efficiencyScore}</strong></span>
+                  <span>Стабильность (совместимость Forge 1.20.1): <strong className="text-[#3ddc84] font-mono">{sb.stabilityScore}</strong></span>
+                  <span>Покрытие: <strong className="text-[#e6e8ea] font-mono">{sb.coverageScore}</strong></span>
                   <span>Синергии: <strong className="text-[#3ddc84] font-mono">+{sb.synergyBonus}</strong></span>
-                  {(sb.bloatPenalty > 0 || sb.penaltyPoints > 0) && (
+                  {(sb.bloatPenalty > 0 || sb.artifactPenalty > 0 || sb.penaltyPoints > 0) && (
                     <span className="text-[#e55353] font-mono">
-                      Штрафы: -{sb.penaltyPoints + sb.bloatPenalty}
+                      Штрафы за конфликты/балласт: -{sb.penaltyPoints + sb.bloatPenalty + sb.artifactPenalty}
                     </span>
                   )}
                 </div>
@@ -847,6 +867,26 @@ export function CheckerTab({ checkedModIds, setCheckedModIds, prefs, onOpenDetai
                 )}
               </div>
             )}
+
+            <div className="pt-2 border-t border-[#2a2e33] flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
+              <span className="text-[#8b9199] font-medium">Подсистемы:</span>
+              {impactSummary.subsystemScores.map(sub => (
+                <span key={sub.id} className="tabular-nums">
+                  <span className={sub.covered ? 'text-[#e6e8ea]' : 'text-[#8b9199]'}>{sub.title}:</span>{' '}
+                  <strong
+                    className={`font-mono ${
+                      sub.scorePct >= 75
+                        ? 'text-[#3ddc84]'
+                        : sub.scorePct >= 40
+                          ? 'text-[#e6e8ea]'
+                          : 'text-[#e5a93c]'
+                    }`}
+                  >
+                    {sub.scorePct}%
+                  </strong>
+                </span>
+              ))}
+            </div>
           </div>
         );
       })()}
