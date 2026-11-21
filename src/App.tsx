@@ -138,7 +138,6 @@ export default function App() {
   };
 
   const setActiveTab = (next: PersistedTabKey) => {
-    touchSavedDate();
     setActiveTabState(next);
   };
 

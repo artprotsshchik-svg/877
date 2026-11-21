@@ -57,7 +57,14 @@ export function getMissingDependenciesForMod(
     const altGroups = MOD_ALTERNATIVE_DEPENDENCIES[modId] || [];
     for (const group of altGroups) {
       if (group.length > 0 && !group.some((id: string) => selectedSet.has(id))) {
-        const firstValid = group.find((id: string) => MOD_BY_ID.has(id));
+        const firstNonConflicting = group.find((id: string) => {
+          const candidate = MOD_BY_ID.get(id);
+          if (!candidate || isUnsupportedOnForge(candidate) || candidate.status === 'danger') return false;
+          if (getRuleConflictingIds(id).some(cid => selectedSet.has(cid))) return false;
+          const deps = getTransitiveDependencies(id, new Set(), selectedSet);
+          return !deps.some(depId => getRuleConflictingIds(depId).some(cid => selectedSet.has(cid)));
+        });
+        const firstValid = firstNonConflicting ?? group.find((id: string) => MOD_BY_ID.has(id));
         if (firstValid) missingSet.add(firstValid);
       }
     }
@@ -131,7 +138,7 @@ export function getConflictsForMod(
   const targetMod = MOD_BY_ID.get(modId);
   const canReplace =
     conflictingIds.length > 0 &&
-    Boolean(targetMod && targetMod.status !== 'danger');
+    Boolean(targetMod && targetMod.status !== 'danger' && !isUnsupportedOnForge(targetMod));
 
   return {
     conflictingIds,
@@ -245,7 +252,7 @@ export function replaceConflictingWithMod(
   prefs?: AssemblyPreferences
 ): { nextIds: string[]; replacedNames: string[]; notice: string | null } {
   const targetMod = MOD_BY_ID.get(targetModId);
-  if (!targetMod) {
+  if (!targetMod || targetMod.status === 'danger' || isUnsupportedOnForge(targetMod)) {
     return { nextIds: selectedIds, replacedNames: [], notice: null };
   }
   const { conflictingIds, conflictingNames } = getConflictsForMod(

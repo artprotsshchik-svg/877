@@ -133,15 +133,59 @@ const JAR_ALIASES: Record<string, string> = {
   irisoculusflywheelcompat: 'iris-oculus-flywheel-compat',
   oculusflywheelcompat: 'iris-oculus-flywheel-compat',
   flywheelcompat: 'iris-oculus-flywheel-compat',
+  aegisnetworking: 'aegisnetworking-krypton-hybrid',
+  harichunk: 'hc-harichunk',
+  hcharichunk: 'hc-harichunk',
+  redirector: 'redirector-modern',
+  redirectormodern: 'redirector-modern',
+  tt20: 'tt20-tps-fixer',
+  tt20tpsfixer: 'tt20-tps-fixer',
+  bobby: 'bobby-reforged',
+  notenoughbandwidth: 'not-enough-bandwidth-legacy',
+  moreculling: 'more-culling-reforged',
+  fastloadreforged: 'fastload',
+  languagereload: 'language-reload-reforged',
+  languagereloadunofficial: 'languagereloadunofficial',
+  bonsdlssdiet: 'bons-dlss-diet-complementary-unbound',
+  sodiumleafculling: 'sodium-leaf-culling-unofficial',
+  sodiumembeddiumleafculling: 'sodium-embeddium-leaf-culling',
+  drd: 'drd-dynamic-render-distance',
+  dynamicrenderdistance: 'dynamicrenderdistance',
+  lazydfu: 'lazydfu-forge',
+  starlight: 'starlight-with-create-fix',
+  starlightforge: 'starlight-with-create-fix',
+  iris: 'iris-shaders',
+  irisshaders: 'iris-shaders',
+  memoryleakfix: 'memory-leak-fix-modern-port',
+  kexosyn: 'kexosyn-forge',
+  upscalecraft: 'upscalecraft-forge',
+  stablecappacer: 'stablecap-pacer-forge-1-19-2',
+  clearlagg: 'clearlagg-server-forge',
+  clearlaggserver: 'clearlagg-server-forge',
+  concurrentchunkmanagementengine: 'concurrent-chunk-management-engine-forge-c2me',
+  concurrentchunkmanagementengineforgec2me: 'concurrent-chunk-management-engine-forge-c2me',
 };
 
 const MOD_TOKEN_INDEX = (() => {
   const index = new Map<string, ModItem>();
-  for (const mod of MODS_DATABASE) {
-    const idNorm = mod.id.replace(/[^a-z0-9]/gi, '').toLowerCase();
-    const nameNorm = mod.name.replace(/[^a-z0-9]/gi, '').toLowerCase();
-    if (idNorm.length >= 4 && !index.has(idNorm)) index.set(idNorm, mod);
-    if (nameNorm.length >= 4 && !index.has(nameNorm)) index.set(nameNorm, mod);
+  // Prioritize Forge-native / non-Fabric-only mods so clean Forge tokens aren't stolen by reference Fabric/NeoForge entries
+  const orderedMods = [...MODS_DATABASE].sort((a, b) => {
+    const aUnsupported = a.platform === 'Fabric' || a.platform === 'NeoForge' ? 1 : 0;
+    const bUnsupported = b.platform === 'Fabric' || b.platform === 'NeoForge' ? 1 : 0;
+    return aUnsupported - bUnsupported;
+  });
+  for (const mod of orderedMods) {
+    const candidates = [
+      mod.id.replace(/[^a-z0-9]/gi, '').toLowerCase(),
+      mod.name.replace(/[^a-z0-9]/gi, '').toLowerCase(),
+      normalizeJarToken(mod.id),
+      normalizeJarToken(mod.name),
+    ];
+    for (const token of candidates) {
+      if (token.length >= 4 && !index.has(token)) {
+        index.set(token, mod);
+      }
+    }
   }
   return index;
 })();
@@ -184,7 +228,7 @@ export function matchJarFilenamesToMods(jarFiles: string[]): {
 
     let partialHit: ModItem | undefined;
     for (const [aliasKey, modId] of Object.entries(JAR_ALIASES)) {
-      if (token.startsWith(aliasKey) && token.length - aliasKey.length <= 6) {
+      if (aliasKey.length >= 4 && token.startsWith(aliasKey) && token.length - aliasKey.length <= 6) {
         matchedSet.add(modId);
         partialHit = MODS_DATABASE.find(m => m.id === modId);
         break;

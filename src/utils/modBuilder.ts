@@ -263,10 +263,16 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
   }
 
   // Strictly one CPU/thread scheduler per assembly to prevent priority tug-of-war
-  if ((isHeavy || isHeavyPack) && !isPotato && activeAnchor?.id !== 'smooth-boot-reloaded' && activeAnchor?.id !== 'threadtweak-reforged') {
-    ids.add('stutterfix-reforged');
-  } else if (activeAnchor?.id !== 'stutterfix-reforged' && activeAnchor?.id !== 'threadtweak-reforged') {
-    ids.add('smooth-boot-reloaded');
+  const anchorInThreadPool =
+    activeAnchor?.id === 'stutterfix-reforged' ||
+    activeAnchor?.id === 'stutterfix-modern-port' ||
+    Boolean(activeAnchor && EXCLUSIVE_ENGINE_POOLS['thread-schedulers'].includes(activeAnchor.id));
+  if (!anchorInThreadPool) {
+    if ((isHeavy || isHeavyPack) && !isPotato) {
+      ids.add('stutterfix-reforged');
+    } else {
+      ids.add('smooth-boot-reloaded');
+    }
   }
 
   if (effectivePrefs.mode !== 'singleplayer' && (isHeavy || (isHeavyPack && !isPotato))) {
@@ -850,15 +856,12 @@ export function smartFixAssembly(selectedIds: string[], prefs?: AssemblyPreferen
     else next.delete('fix-gpu-memory-leak');
   }
 
-  if (
-    next.has('stutterfix-reforged') &&
-    (next.has('threadtweak-reforged') || next.has('smooth-boot-reloaded'))
-  ) {
-    if (focusId === 'threadtweak-reforged' || focusId === 'smooth-boot-reloaded') {
+  const activeSchedulers = EXCLUSIVE_ENGINE_POOLS['thread-schedulers'].filter(id => next.has(id));
+  if (next.has('stutterfix-reforged') && activeSchedulers.length > 0) {
+    if (focusId && activeSchedulers.includes(focusId)) {
       next.delete('stutterfix-reforged');
     } else {
-      next.delete('threadtweak-reforged');
-      next.delete('smooth-boot-reloaded');
+      for (const sid of activeSchedulers) next.delete(sid);
     }
   }
 
@@ -926,6 +929,10 @@ export function smartFixAssembly(selectedIds: string[], prefs?: AssemblyPreferen
   } else if (next.has('keep-the-resourcepack') && next.has('packforge')) {
     if (focusId === 'packforge') next.delete('keep-the-resourcepack');
     else next.delete('packforge');
+  }
+  if (next.has('zstdnet') && next.has('krypton-reno')) {
+    if (focusId === 'zstdnet') next.delete('krypton-reno');
+    else next.delete('zstdnet');
   }
 
   for (const id of Array.from(next)) {
@@ -1058,21 +1065,7 @@ export function smartFixAssembly(selectedIds: string[], prefs?: AssemblyPreferen
   }
 
   // Clean orphaned mod-specific libraries whose consumers are not present
-  const strictSinglePurposeLibs: Array<[string, string[]]> = [
-    ['matlib', LIBRARY_CONSUMER_MAP['matlib']],
-    ['cupboard', LIBRARY_CONSUMER_MAP['cupboard']],
-    ['fzzy-config', LIBRARY_CONSUMER_MAP['fzzy-config']],
-    ['resourceful-config', LIBRARY_CONSUMER_MAP['resourceful-config']],
-    ['sodium-embeddium-options-api', LIBRARY_CONSUMER_MAP['sodium-embeddium-options-api']],
-    ['puzzles-lib', LIBRARY_CONSUMER_MAP['puzzles-lib']],
-    ['almanac', LIBRARY_CONSUMER_MAP['almanac']],
-    ['placebo', LIBRARY_CONSUMER_MAP['placebo']],
-    ['architectury-api', LIBRARY_CONSUMER_MAP['architectury-api']],
-    ['rinlib', LIBRARY_CONSUMER_MAP['rinlib']],
-    ['searchables', LIBRARY_CONSUMER_MAP['searchables']],
-    ['accelerated-recoiling', ['accelerated-rendering', 'accelerated-rendering-turned']],
-  ];
-  for (const [libId, consumers] of strictSinglePurposeLibs) {
+  for (const [libId, consumers] of SINGLE_PURPOSE_LIBS) {
     if (next.has(libId) && idNotProtected(libId, focusId, focusDepSet)) {
       if (!consumers.some(c => next.has(c))) {
         next.delete(libId);
@@ -1096,6 +1089,21 @@ export function smartFixAssembly(selectedIds: string[], prefs?: AssemblyPreferen
 
   return Array.from(next);
 }
+
+const SINGLE_PURPOSE_LIBS: ReadonlyArray<readonly [string, string[]]> = [
+  ['matlib', LIBRARY_CONSUMER_MAP['matlib']],
+  ['cupboard', LIBRARY_CONSUMER_MAP['cupboard']],
+  ['fzzy-config', LIBRARY_CONSUMER_MAP['fzzy-config']],
+  ['resourceful-config', LIBRARY_CONSUMER_MAP['resourceful-config']],
+  ['sodium-embeddium-options-api', LIBRARY_CONSUMER_MAP['sodium-embeddium-options-api']],
+  ['puzzles-lib', LIBRARY_CONSUMER_MAP['puzzles-lib']],
+  ['almanac', LIBRARY_CONSUMER_MAP['almanac']],
+  ['placebo', LIBRARY_CONSUMER_MAP['placebo']],
+  ['architectury-api', LIBRARY_CONSUMER_MAP['architectury-api']],
+  ['rinlib', LIBRARY_CONSUMER_MAP['rinlib']],
+  ['searchables', LIBRARY_CONSUMER_MAP['searchables']],
+  ['accelerated-recoiling', ['accelerated-rendering', 'accelerated-rendering-turned']],
+];
 
 function idNotProtected(id: string, focusId: string | null, focusDepSet: Set<string>): boolean {
   return id !== focusId && !focusDepSet.has(id);
@@ -1141,19 +1149,7 @@ export function toggleModSmart(
     }
 
     // Clean orphaned single-purpose libraries whose evicted consumer left them unused
-    const singlePurposeLibs: Array<[string, string[]]> = [
-      ['matlib', LIBRARY_CONSUMER_MAP['matlib']],
-      ['cupboard', LIBRARY_CONSUMER_MAP['cupboard']],
-      ['fzzy-config', LIBRARY_CONSUMER_MAP['fzzy-config']],
-      ['resourceful-config', LIBRARY_CONSUMER_MAP['resourceful-config']],
-      ['sodium-embeddium-options-api', LIBRARY_CONSUMER_MAP['sodium-embeddium-options-api']],
-      ['puzzles-lib', LIBRARY_CONSUMER_MAP['puzzles-lib']],
-      ['almanac', LIBRARY_CONSUMER_MAP['almanac']],
-      ['placebo', LIBRARY_CONSUMER_MAP['placebo']],
-      ['architectury-api', LIBRARY_CONSUMER_MAP['architectury-api']],
-      ['rinlib', LIBRARY_CONSUMER_MAP['rinlib']],
-    ];
-    for (const [libId, consumers] of singlePurposeLibs) {
+    for (const [libId, consumers] of SINGLE_PURPOSE_LIBS) {
       if (next.has(libId) && consumers.some(c => removedIdSet.has(c)) && !consumers.some(c => next.has(c))) {
         next.delete(libId);
         removedDependents.push(MOD_BY_ID.get(libId)?.name || libId);
@@ -1276,19 +1272,23 @@ export function toggleModSmart(
     }
   };
 
-  if (modId === 'calm-the-leaks') {
+  if (next.has('calm-the-leaks') && !currentSet.has('calm-the-leaks')) {
     addCompanionIfSafe('alltheleaks-memory-leak-fix');
   }
-  if (modId === 'advanced-loot-info-ali') {
+  if (next.has('advanced-loot-info-ali') && !currentSet.has('advanced-loot-info-ali')) {
     addCompanionIfSafe('fastali');
   }
-  if (modId === 'c2me-concurrent-chunk-management-engine') {
+  if (next.has('c2me-concurrent-chunk-management-engine') && !currentSet.has('c2me-concurrent-chunk-management-engine')) {
     addCompanionIfSafe('connector-extras');
   }
+  const dhJustAdded = next.has('distant-horizons') && !currentSet.has('distant-horizons');
+  const shaderJustAdded =
+    (next.has('oculus') && !currentSet.has('oculus')) ||
+    (next.has('emberlens') && !currentSet.has('emberlens'));
   if (
     next.has('distant-horizons') &&
     (next.has('oculus') || next.has('emberlens')) &&
-    (modId === 'distant-horizons' || modId === 'oculus' || modId === 'emberlens')
+    (dhJustAdded || shaderJustAdded)
   ) {
     addCompanionIfSafe('distant-horizons-memory-fix-dh');
   }
@@ -1304,13 +1304,13 @@ export function toggleModSmart(
     addCompanionIfSafe('modernfix');
     addCompanionIfSafe('ferritecore');
   }
-  if (
-    (modId === 'c2me-concurrent-chunk-management-engine' ||
-      modId === 'concurrent-chunk-management-engine-forge-c2me' ||
-      modId === 'c2mer' ||
-      modId === 'hc-harichunk') &&
-    (next.has('canary') || next.has('radium-reforged'))
-  ) {
+  const c2meJustAdded = [
+    'c2me-concurrent-chunk-management-engine',
+    'concurrent-chunk-management-engine-forge-c2me',
+    'c2mer',
+    'hc-harichunk',
+  ].some(id => next.has(id) && !currentSet.has(id));
+  if (c2meJustAdded && (next.has('canary') || next.has('radium-reforged'))) {
     for (const oldLithiumId of ['canary', 'radium-reforged']) {
       if (next.delete(oldLithiumId)) {
         evictedIds.add(oldLithiumId);
@@ -1338,19 +1338,7 @@ export function toggleModSmart(
 
   // Clean orphaned single-purpose libraries or idle Sinytra bridges if conflict eviction removed their consumers
   if (evictedIds.size > 0) {
-    const singlePurposeLibs: Array<[string, string[]]> = [
-      ['matlib', LIBRARY_CONSUMER_MAP['matlib']],
-      ['cupboard', LIBRARY_CONSUMER_MAP['cupboard']],
-      ['fzzy-config', LIBRARY_CONSUMER_MAP['fzzy-config']],
-      ['resourceful-config', LIBRARY_CONSUMER_MAP['resourceful-config']],
-      ['sodium-embeddium-options-api', LIBRARY_CONSUMER_MAP['sodium-embeddium-options-api']],
-      ['puzzles-lib', LIBRARY_CONSUMER_MAP['puzzles-lib']],
-      ['almanac', LIBRARY_CONSUMER_MAP['almanac']],
-      ['placebo', LIBRARY_CONSUMER_MAP['placebo']],
-      ['architectury-api', LIBRARY_CONSUMER_MAP['architectury-api']],
-      ['rinlib', LIBRARY_CONSUMER_MAP['rinlib']],
-    ];
-    for (const [libId, consumers] of singlePurposeLibs) {
+    for (const [libId, consumers] of SINGLE_PURPOSE_LIBS) {
       if (libId !== modId && next.has(libId) && consumers.some(c => evictedIds.has(c)) && !consumers.some(c => next.has(c))) {
         next.delete(libId);
         removedNames.push(MOD_BY_ID.get(libId)?.name || libId);
@@ -1411,19 +1399,7 @@ export function removeModsCascade(currentIds: string[], removeIds: string[]): { 
     }
   }
 
-  const singlePurposeLibs: Array<[string, string[]]> = [
-    ['matlib', LIBRARY_CONSUMER_MAP['matlib']],
-    ['cupboard', LIBRARY_CONSUMER_MAP['cupboard']],
-    ['fzzy-config', LIBRARY_CONSUMER_MAP['fzzy-config']],
-    ['resourceful-config', LIBRARY_CONSUMER_MAP['resourceful-config']],
-    ['sodium-embeddium-options-api', LIBRARY_CONSUMER_MAP['sodium-embeddium-options-api']],
-    ['puzzles-lib', LIBRARY_CONSUMER_MAP['puzzles-lib']],
-    ['almanac', LIBRARY_CONSUMER_MAP['almanac']],
-    ['placebo', LIBRARY_CONSUMER_MAP['placebo']],
-    ['architectury-api', LIBRARY_CONSUMER_MAP['architectury-api']],
-    ['rinlib', LIBRARY_CONSUMER_MAP['rinlib']],
-  ];
-  for (const [libId, consumers] of singlePurposeLibs) {
+  for (const [libId, consumers] of SINGLE_PURPOSE_LIBS) {
     if (next.has(libId) && consumers.some(c => removedIdSet.has(c)) && !consumers.some(c => next.has(c))) {
       next.delete(libId);
       cascadedNames.push(MOD_BY_ID.get(libId)?.name || libId);

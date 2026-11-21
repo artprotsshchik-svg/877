@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ModItem } from '../data/modsData.ts';
-import { MOD_GROUPS } from '../data/modsData.ts';
+import { getSubsystemIdForMod } from '../utils/modAnalyzer.ts';
 import type {
   AssemblyImpactSummary,
   AssemblyPreferences,
@@ -277,17 +277,9 @@ export function AssemblyDetailModal({
               </div>
               <div className="space-y-2">
                 {subsystemScores.map(sub => {
-                  const subMods = analyzedMods.filter(row => {
-                    const grp = MOD_GROUPS.find(g => g.id === row.mod.groupId);
-                    if (!grp) return false;
-                    if (sub.id === 'render') return grp.id === 'core-renderer' || grp.id === 'shaders-pipeline';
-                    if (sub.id === 'memory') return grp.id === 'memory-core';
-                    if (sub.id === 'tps') return grp.id === 'tick-physics-engine';
-                    if (sub.id === 'culling') return ['block-culling', 'leaves-culling', 'block-entities'].includes(grp.id);
-                    if (sub.id === 'worldgen') return grp.id === 'worldgen-chunks' || grp.id === 'lighting-engine';
-                    if (sub.id === 'cpu-audio') return ['upscaling-bg', 'cpu-threads', 'particles-audio', 'boot-loading'].includes(grp.id);
-                    return ['networking', 'items-clearlag', 'recipes-jei'].includes(grp.id);
-                  });
+                  const subMods = analyzedMods
+                    .filter(row => getSubsystemIdForMod(row.mod) === sub.id)
+                    .sort((a, b) => b.impact.impactPoints - a.impact.impactPoints);
 
                   return (
                     <div key={sub.id} className="space-y-1">

@@ -239,3 +239,7 @@ entityModelCulling = false`,
   },
 ];
 
+export function getRecommendedConfigsForMod(modId: string): ModConfigEntry[] {
+  return MOD_RECOMMENDED_CONFIGS.filter(entry => entry.modId === modId);
+}
+

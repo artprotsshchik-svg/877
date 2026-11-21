@@ -4,8 +4,12 @@ import type {
   AssemblyPreferences,
 } from './modTypes.ts';
 import {
+  PURE_LIBRARY_MOD_IDS,
+  SINYTRA_BRIDGE_IDS,
   analyzeSelection,
   getModEffectivenessScore,
+  getModSuperseder,
+  isUnsupportedOnForge,
 } from './modAnalyzer.ts';
 
 export interface HonestFpsEstimate {
@@ -40,8 +44,11 @@ const FPS_WEIGHT_OVERRIDE: Record<string, number> = {
   alloyium: 0.09,
   kerria: 0.05,
   'particle-core': 0.06,
-  'fast-ip-ping': 0.01,
-  'smooth-boot-reloaded': 0.02,
+  'fast-ip-ping': 0.0,
+  'smooth-boot-reloaded': 0.015,
+  'stutterfix-reforged': 0.02,
+  'ixeris': 0.02,
+  'clumps': 0.02,
   'dynamic-fps': 0.01,
   'faster-iris-shadow-mapper': 0.12,
   shadowlod: 0.09,
@@ -56,7 +63,7 @@ const FPS_WEIGHT_OVERRIDE: Record<string, number> = {
   lightstar: 0.03,
   'let-me-despawn': 0.02,
   'iris-oculus-flywheel-compat': 0.06,
-  'toast-control': 0.01,
+  'toast-control': 0.0,
   fastload: 0.01,
   ksyxis: 0.01,
   'fix-gpu-memory-leak': 0.01,
@@ -114,17 +121,42 @@ export function estimateFpsRange(
 
   for (const id of selectedSet) {
     const mod = MOD_BY_ID.get(id);
-    if (!mod || mod.status === 'danger' || mod.coveredBy) continue;
+    if (
+      !mod ||
+      mod.status === 'danger' ||
+      mod.status === 'diagnostic' ||
+      mod.status === 'redundant' ||
+      mod.coveredBy ||
+      isUnsupportedOnForge(mod) ||
+      PURE_LIBRARY_MOD_IDS.has(id) ||
+      SINYTRA_BRIDGE_IDS.has(id) ||
+      mod.category.includes('Профилировщики')
+    ) {
+      continue;
+    }
+    if (getModSuperseder(mod, selectedSet, prefs, false)?.isActiveInSelection) {
+      continue;
+    }
 
     let w = FPS_WEIGHT_OVERRIDE[id];
     if (w === undefined) {
       const eff = getModEffectivenessScore(mod);
-      if (mod.category.includes('Рендер') || mod.category.includes('Отрисовка')) {
-        w = eff >= 80 ? 0.09 : eff >= 60 ? 0.05 : 0.02;
-      } else if (mod.category.includes('Тики') || mod.category.includes('Память') || mod.category.includes('Чанки')) {
-        w = eff >= 80 ? 0.05 : 0.025;
+      if (
+        mod.category.includes('Рендер') ||
+        mod.category.includes('Освещение') ||
+        mod.category.includes('Апскейл')
+      ) {
+        w = eff >= 80 ? 0.08 : eff >= 60 ? 0.04 : 0.015;
+      } else if (
+        mod.category.includes('Тики') ||
+        mod.category.includes('Память') ||
+        mod.category.includes('Чанки') ||
+        mod.category.includes('Частицы') ||
+        mod.category.includes('Потоки')
+      ) {
+        w = eff >= 80 ? 0.04 : eff >= 65 ? 0.02 : 0;
       } else {
-        w = 0.012;
+        w = 0;
       }
     }
 

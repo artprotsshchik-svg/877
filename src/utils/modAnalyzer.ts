@@ -227,7 +227,7 @@ export const MOD_ALTERNATIVE_DEPENDENCIES: Record<string, string[][]> = {
 
 const NVIDIUM_FAMILY_IDS = new Set(['nvidium']);
 
-const PURE_LIBRARY_MOD_IDS = new Set([
+export const PURE_LIBRARY_MOD_IDS = new Set([
   'kotlin-for-forge',
   'fzzy-config',
   'matlib',
@@ -1172,18 +1172,23 @@ export function analyzeSelection(selectedIds: string[]) {
     }
   }
 
-  if (
-    selectedSet.has('stutterfix-reforged') &&
-    (selectedSet.has('threadtweak-reforged') || selectedSet.has('smooth-boot-reloaded'))
-  ) {
-    const peerSchedulers = ['threadtweak-reforged', 'smooth-boot-reloaded']
-      .filter(id => selectedSet.has(id))
-      .map(id => MOD_BY_ID.get(id)?.name || id);
+  const threadSchedulerPeers = EXCLUSIVE_ENGINE_POOLS['thread-schedulers'].filter(id => selectedSet.has(id));
+  if (selectedSet.has('stutterfix-reforged') && threadSchedulerPeers.length > 0) {
+    const peerNames = threadSchedulerPeers.map(id => MOD_BY_ID.get(id)?.name || id);
     warnings.push({
       modId: 'stutterfix-reforged',
       modName: 'StutterFix-Reforged',
       severity: 'yellow',
-      message: `Пересечение планировщиков CPU: StutterFix-Reforged и ${peerSchedulers.join(' / ')} одновременно переназначают приоритеты потоков — оставьте один планировщик.`,
+      message: `Пересечение планировщиков CPU: StutterFix-Reforged и ${peerNames.join(' / ')} одновременно переназначают приоритеты потоков — оставьте один планировщик.`,
+    });
+  }
+
+  if (selectedSet.has('zstdnet') && selectedSet.has('krypton-reno')) {
+    warnings.push({
+      modId: 'zstdnet',
+      modName: 'ZSTDNET',
+      severity: 'yellow',
+      message: 'ZSTDNET рядом с Krypton Reno отключает часть сжатия либо ломает вход ванильных клиентов без ZSTDNET.',
     });
   }
 
@@ -3135,6 +3140,24 @@ const SUBSYSTEM_DEFINITIONS: Array<{
   },
 ];
 
+export function getSubsystemIdForMod(mod: ModItem): string | null {
+  for (const sub of SUBSYSTEM_DEFINITIONS) {
+    if (Object.prototype.hasOwnProperty.call(sub.weights, mod.id)) {
+      return sub.key;
+    }
+  }
+  const gid = mod.groupId || '';
+  for (const sub of SUBSYSTEM_DEFINITIONS) {
+    if (sub.groupIds.includes(gid)) {
+      return sub.key;
+    }
+  }
+  if (gid === 'lod-nvidium') {
+    return 'worldgen';
+  }
+  return null;
+}
+
 const ARTIFACT_CULLER_IDS = new Set([
   'more-culling-reforged',
   'culllessleaves-reforged',
@@ -3950,7 +3973,7 @@ function computePackScoreInternal(
   if (selectedSet.has('more-culling-reforged') && selectedSet.has('fast-item-frames')) penalty += 1.5;
   if (
     selectedSet.has('stutterfix-reforged') &&
-    (selectedSet.has('threadtweak-reforged') || selectedSet.has('smooth-boot-reloaded'))
+    EXCLUSIVE_ENGINE_POOLS['thread-schedulers'].some(id => selectedSet.has(id))
   ) {
     penalty += 1.5;
   }
@@ -4401,10 +4424,11 @@ export function evaluateModImpactInPack(
   }
 
   // CPU input & audio & LOD & recipes & QoL
-  if (mod.id === 'ixeris' && (withoutSet.has('stutterfix-reforged') || withoutSet.has('threadtweak-reforged') || withoutSet.has('smooth-boot-reloaded'))) {
-    addSynergy(['stutterfix-reforged', 'threadtweak-reforged', 'smooth-boot-reloaded'], 'Убирает статтеры ввода мыши и выравнивает фреймтайм потоков CPU', 110);
+  const threadSchedulerIds = EXCLUSIVE_ENGINE_POOLS['thread-schedulers'];
+  if (mod.id === 'ixeris' && (withoutSet.has('stutterfix-reforged') || threadSchedulerIds.some(id => withoutSet.has(id)))) {
+    addSynergy(['stutterfix-reforged', ...threadSchedulerIds], 'Убирает статтеры ввода мыши и выравнивает фреймтайм потоков CPU', 110);
   }
-  if (mod.id === 'threadtweak-reforged' || mod.id === 'smooth-boot-reloaded') {
+  if (threadSchedulerIds.includes(mod.id)) {
     if (withoutSet.has('ixeris')) {
       addSynergy(['ixeris'], 'Управляет приоритетами потоков CPU в паре с асинхронным вводом Ixeris', 80);
     }
@@ -4415,8 +4439,9 @@ export function evaluateModImpactInPack(
     if (withoutSet.has('ixeris')) {
       addSynergy(['ixeris'], 'Согласует кадр и распределение потоков CPU с асинхронным вводом Ixeris', 95);
     }
-    if (withoutSet.has('threadtweak-reforged') || withoutSet.has('smooth-boot-reloaded')) {
-      addOverlap(['threadtweak-reforged', 'smooth-boot-reloaded'], 'Пересечение планировщиков: StutterFix уже настраивает потоки (ThreadTweak / Smooth Boot излишни)', -70);
+    const activePeers = threadSchedulerIds.filter(id => withoutSet.has(id));
+    if (activePeers.length > 0) {
+      addOverlap(activePeers, 'Пересечение планировщиков: StutterFix уже настраивает потоки (сторонний планировщик/регулятор излишен)', -70);
     }
   }
   if (mod.id === 'packet-fixer') {
@@ -4702,6 +4727,9 @@ export function evaluateModImpactInPack(
   }
 
   if (mod.id === 'zstdnet') {
+    if (withoutSet.has('krypton-reno')) {
+      addOverlap(['krypton-reno'], 'ZSTDNET рядом с Krypton Reno отключает часть сжатия либо ломает вход клиентов без ZSTDNET', -90);
+    }
     interactions.push({
       kind: 'context',
       targetIds: [],
@@ -4709,6 +4737,8 @@ export function evaluateModImpactInPack(
       summary: 'Протокольный нюанс: ZSTDNET обязан стоять и на сервере, и у каждого клиента (несовместим с ванильным входом и встроенным Zstd в Krypton Hybrid)',
       impactDelta: -30,
     });
+  } else if (mod.id === 'krypton-reno' && withoutSet.has('zstdnet')) {
+    addOverlap(['zstdnet'], 'ZSTDNET мешает сжатию Krypton Reno и ломает вход ванильных клиентов', -30);
   }
 
   if (mod.id === 'chunky') {

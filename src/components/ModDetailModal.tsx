@@ -3,7 +3,7 @@ import {
   MODS_DATABASE,
   type ModItem,
 } from '../data/modsData.ts';
-import { NVIDIUM_CONFIG_CONTENT } from '../data/modConfigs.ts';
+import { getRecommendedConfigsForMod } from '../data/modConfigs.ts';
 import { cleanModDescription, cleanStatusLabel, formatShortOneLineDescription } from '../utils/displayFormatters.ts';
 import {
   evaluateModImpactInPack,
@@ -66,7 +66,16 @@ export function ModDetailModal({
   onFocusModInBuilder,
 }: ModDetailModalProps) {
   const [configOpen, setConfigOpen] = useState(false);
-  const [configCopied, setConfigCopied] = useState(false);
+  const [copiedConfigKey, setCopiedConfigKey] = useState<string | null>(null);
+  const modConfigs = useMemo(
+    () => (mod ? getRecommendedConfigsForMod(mod.id) : []),
+    [mod]
+  );
+
+  useEffect(() => {
+    setConfigOpen(false);
+    setCopiedConfigKey(null);
+  }, [mod?.id]);
   const groupInfo = useMemo(() => {
     if (!mod?.groupId) return null;
     return getGroupMembersByRole(mod.groupId);
@@ -325,7 +334,7 @@ export function ModDetailModal({
               </div>
             )}
 
-            {mod.bestAlternative && (
+            {mod.bestAlternative && mod.bestAlternative.trim().length > 1 && (
               <div className="flex items-start gap-2.5 p-3 rounded-[4px] bg-[#3ddc84]/[0.06] border border-[#3ddc84]/30 text-xs text-[#3ddc84]">
                 <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
                 <div>
@@ -348,10 +357,10 @@ export function ModDetailModal({
             )}
           </div>
 
-          {/* A4: Collapsible Config Block in Nvidium Mod Card */}
-          {mod.id === 'nvidium' && (
+          {/* Collapsible Recommended Config Block */}
+          {modConfigs.length > 0 && (
             <section
-              aria-label="Конфиг Nvidium"
+              aria-label={mod.id === 'nvidium' ? 'Конфиг Nvidium' : `Конфиг ${mod.name}`}
               className="bg-[#121417] border border-[#2a2e33] rounded-[6px] overflow-hidden"
             >
               <button
@@ -360,30 +369,41 @@ export function ModDetailModal({
                 aria-expanded={configOpen}
                 className="w-full px-4 py-3 flex items-center justify-between gap-2 text-left hover:bg-[#22262b] transition-colors duration-150"
               >
-                <span className="text-sm font-semibold text-[#e6e8ea]">Конфиг</span>
+                <span className="text-sm font-semibold text-[#e6e8ea]">
+                  Конфиг{modConfigs.length > 1 ? ` (${modConfigs.length})` : ''}
+                </span>
                 <span className="text-xs text-[#8b9199] inline-flex items-center gap-1">
                   {configOpen ? 'Свернуть' : 'Развернуть'}
                   {configOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </span>
               </button>
               {configOpen && (
-                <div className="px-4 pb-4 pt-2 border-t border-[#2a2e33] space-y-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-[#8b9199] font-mono">config/nvidium.json</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard?.writeText?.(NVIDIUM_CONFIG_CONTENT)?.catch(() => {});
-                        setConfigCopied(true);
-                        setTimeout(() => setConfigCopied(false), 1800);
-                      }}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] bg-[#1a1d21] hover:bg-[#22262b] border border-[#2a2e33] text-xs font-medium text-[#e6e8ea] transition-colors duration-150"
-                    >
-                      {configCopied ? <Check className="w-3.5 h-3.5 text-[#3ddc84]" /> : <Copy className="w-3.5 h-3.5" />}
-                      {configCopied ? 'Скопировано' : 'Копировать'}
-                    </button>
-                  </div>
-                  <pre className="p-3 rounded-[4px] bg-[#121417] border border-[#2a2e33] font-mono text-xs text-[#e6e8ea] overflow-x-auto select-all">{NVIDIUM_CONFIG_CONTENT}</pre>
+                <div className="px-4 pb-4 pt-2 border-t border-[#2a2e33] space-y-4">
+                  {modConfigs.map(cfg => {
+                    const cfgKey = `${cfg.modId}:${cfg.filePath}`;
+                    const isCopied = copiedConfigKey === cfgKey;
+                    return (
+                      <div key={cfgKey} className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs text-[#8b9199] font-mono">{cfg.filePath}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard?.writeText?.(cfg.content)?.catch(() => {});
+                              setCopiedConfigKey(cfgKey);
+                              setTimeout(() => setCopiedConfigKey(prev => (prev === cfgKey ? null : prev)), 1800);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] bg-[#1a1d21] hover:bg-[#22262b] border border-[#2a2e33] text-xs font-medium text-[#e6e8ea] transition-colors duration-150 shrink-0"
+                          >
+                            {isCopied ? <Check className="w-3.5 h-3.5 text-[#3ddc84]" /> : <Copy className="w-3.5 h-3.5" />}
+                            {isCopied ? 'Скопировано' : 'Копировать'}
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-[#8b9199] leading-snug">{cfg.note}</p>
+                        <pre className="p-3 rounded-[4px] bg-[#121417] border border-[#2a2e33] font-mono text-xs text-[#e6e8ea] overflow-x-auto select-all">{cfg.content}</pre>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </section>
