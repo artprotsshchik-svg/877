@@ -1648,7 +1648,7 @@
     "statusLabel": "Быстрые события",
     "healthTier": "yellow",
     "description": "Ускоряет обработку событий интерфейса и ввода.",
-    "bestAlternative": "FastEvent.",
+    "bestAlternative": "Оставьте максимум один перехватчик событий (или положитесь на ModernFix + Radium Re-Reforged).",
     "warning": "",
     "tags": [],
     "curseforgeUrl": "https://www.curseforge.com/minecraft/search?search=Fast%20Events&class=mc-mods",

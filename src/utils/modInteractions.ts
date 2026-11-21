@@ -110,24 +110,23 @@ export function getConflictsForMod(
     }
   }
 
-  if (groupId) {
-    const pool = EXCLUSIVE_ENGINE_POOLS[groupId] || [];
+  const targetPoolKeys = new Set<string>();
+  if (groupId && EXCLUSIVE_ENGINE_POOLS[groupId]) {
+    targetPoolKeys.add(groupId);
+  }
+  const mod = MOD_BY_ID.get(modId);
+  if (mod?.groupId && EXCLUSIVE_ENGINE_POOLS[mod.groupId]) {
+    targetPoolKeys.add(mod.groupId);
+  }
+  for (const [k, pool] of Object.entries(EXCLUSIVE_ENGINE_POOLS)) {
+    if (pool.includes(modId)) targetPoolKeys.add(k);
+  }
+  for (const key of targetPoolKeys) {
+    const pool = EXCLUSIVE_ENGINE_POOLS[key] || [];
     if (pool.includes(modId)) {
       for (const pid of pool) {
         if (pid !== modId && selectedSet.has(pid)) {
           conflictingSet.add(pid);
-        }
-      }
-    }
-  } else {
-    const mod = MOD_BY_ID.get(modId);
-    if (mod?.groupId) {
-      const pool = EXCLUSIVE_ENGINE_POOLS[mod.groupId] || [];
-      if (pool.includes(modId)) {
-        for (const pid of pool) {
-          if (pid !== modId && selectedSet.has(pid)) {
-            conflictingSet.add(pid);
-          }
         }
       }
     }
@@ -203,8 +202,12 @@ export function getCompatibleAddonsForMod(mod: ModItem, addons: ModItem[]): ModI
       modDepConflicts.add(cid);
     }
   }
-  const modPool = Object.values(EXCLUSIVE_ENGINE_POOLS).find(pool => pool.includes(mod.id));
-  const modPoolSet = modPool ? new Set(modPool) : null;
+  const modPoolSet = new Set<string>();
+  for (const pool of Object.values(EXCLUSIVE_ENGINE_POOLS)) {
+    if (pool.includes(mod.id)) {
+      for (const pid of pool) modPoolSet.add(pid);
+    }
+  }
   const modContext = new Set<string>([mod.id, ...getTransitiveDependencies(mod.id)]);
 
   return addons.filter(addon => {

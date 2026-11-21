@@ -276,7 +276,8 @@ export function CheckerTab({ checkedModIds, setCheckedModIds, prefs, onOpenDetai
     const tokens = rawText
       .split(/[\n,;]+/)
       .map(s => s.trim().replace(/^["']|["']$/g, '').replace(/^\d+\.\s*/, '').replace(/^↳\s*/, ''))
-      .filter(Boolean);
+      .filter(Boolean)
+      .filter(s => !/^\.connector(\b|\/|\s|$)/i.test(s));
 
     const matchedSet = new Set<string>();
     const unmatched: string[] = [];

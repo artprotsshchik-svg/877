@@ -19,6 +19,7 @@ import {
   getModEffectivenessScore,
   getModSuperseder,
   getRuleConflictingIds,
+  getSoftSlotOverlapEvictionIds,
   getTransitiveDependencies,
   isUnsupportedOnForge,
 } from './modAnalyzer.ts';
@@ -381,7 +382,9 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
     excluded.push({ name: 'Alloyium', reason: 'Заменён на Nvidium (оба мода перехватывают GPU-рендер чанков).' });
   }
 
-  if (!useEmberlensPipeline && effectivePrefs.useShaders && effectivePrefs.goal !== 'potato') {
+  const anchorBreaksShaders =
+    activeAnchor?.id === 'sodium-sightline' || activeAnchor?.id === 'sodium-fovea';
+  if (!useEmberlensPipeline && !anchorBreaksShaders && effectivePrefs.useShaders && effectivePrefs.goal !== 'potato') {
     ids.add('oculus');
     ids.add('faster-iris-shadow-mapper');
     ids.add('gputape');
@@ -393,6 +396,11 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
     if (effectivePrefs.allowSinytra) {
       excluded.push({ name: 'Nvidium', reason: 'Жёсткий конфликт с буферами шейдеров Oculus (исключён автоматически).' });
     }
+  } else if (anchorBreaksShaders && effectivePrefs.useShaders) {
+    excluded.push({
+      name: 'Oculus / Faster Iris Shadow Mapper / ShadowLOD',
+      reason: `${activeAnchor!.name} ломает shadow pass и глубину кадра шейдеров (отключены для стабильности упора).`,
+    });
   } else if (effectivePrefs.useShaders && effectivePrefs.goal === 'potato') {
     excluded.push({ name: 'Oculus и шейдеры', reason: 'Пропущены, так как выбрана цель «Слабый ПК».' });
   }
@@ -1004,13 +1012,21 @@ export function smartFixAssembly(selectedIds: string[], prefs?: AssemblyPreferen
     if (!resolvedAny) break;
   }
 
+  const removedInFix = new Set<string>(selectedIds.filter(id => !next.has(id)));
   let pruneOrphans = true;
   while (pruneOrphans) {
     pruneOrphans = false;
     for (const id of Array.from(next)) {
       const deps = getDirectDependencies(id, next);
-      if (deps.some(d => !next.has(d) && getRuleConflictingIds(d).some(c => next.has(c)))) {
+      if (
+        deps.some(
+          d =>
+            !next.has(d) &&
+            (removedInFix.has(d) || getRuleConflictingIds(d).some(c => next.has(c)))
+        )
+      ) {
         next.delete(id);
+        removedInFix.add(id);
         pruneOrphans = true;
       }
     }
@@ -1192,8 +1208,11 @@ export function toggleModSmart(
       }
     }
 
-    // If last Sinytra consumer was removed and other Forge mods remain, clean up idle bridge mods
-    if (mod.platform.includes('Sinytra')) {
+    // If removing this mod (directly or via dependency cascade) left zero Sinytra consumers while Forge mods remain, clean up idle bridge mods
+    const removedAnySinytraConsumer = Array.from(removedIdSet).some(
+      id => MOD_BY_ID.get(id)?.platform.includes('Sinytra')
+    );
+    if (removedAnySinytraConsumer) {
       const hasSinytraLeft = Array.from(next).some(id => MOD_BY_ID.get(id)?.platform.includes('Sinytra'));
       const hasOtherMods = Array.from(next).some(id => !SINYTRA_BRIDGE_IDS.has(id));
       if (!hasSinytraLeft && hasOtherMods) {
@@ -1256,6 +1275,15 @@ export function toggleModSmart(
     };
   }
 
+  const activeSup = getModSuperseder(mod, currentSet, options.prefs, false);
+  if (activeSup?.isActiveInSelection) {
+    return {
+      nextIds: currentIds,
+      notice: `${mod.name} не нужен — ${activeSup.reason}.`,
+      noticeTone: 'warn',
+    };
+  }
+
   const next = new Set(currentIds);
   const removedNames: string[] = [];
   const evictedIds = new Set<string>();
@@ -1271,12 +1299,26 @@ export function toggleModSmart(
     addedDeps.push(MOD_BY_ID.get('emi')?.name || 'EMI');
   }
 
-  const conflictingIds = getRuleConflictingIds(modId);
+  const conflictingIds = new Set([
+    ...getRuleConflictingIds(modId),
+    ...getSoftSlotOverlapEvictionIds(modId, next),
+  ]);
   for (const cid of conflictingIds) {
     if (next.has(cid)) {
       next.delete(cid);
       evictedIds.add(cid);
       removedNames.push(MOD_BY_ID.get(cid)?.name || cid);
+    }
+  }
+
+  // Also evict existing weaker mods in currentIds that are superseded by the newly added mod
+  for (const existingId of Array.from(next)) {
+    const existingMod = MOD_BY_ID.get(existingId);
+    if (!existingMod) continue;
+    if (existingMod.supersededBy?.includes(modId)) {
+      next.delete(existingId);
+      evictedIds.add(existingId);
+      removedNames.push(existingMod.name);
     }
   }
 

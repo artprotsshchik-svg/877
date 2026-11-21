@@ -31,6 +31,7 @@ const JAR_ALIASES: Record<string, string> = {
   eber: 'enhanced-block-entities-reloaded',
   enhancedblockentitiesreloaded: 'enhanced-block-entities-reloaded',
   enhancedblockentities: 'enhanced-block-entities-reloaded',
+  enhancedblockentitiesreforged: 'enhanced-block-entities-reforged-unofficial',
   fastsounds: 'fast-sounds',
   soundgc: 'soundgc',
   particlecore: 'particle-core',
@@ -75,6 +76,8 @@ const JAR_ALIASES: Record<string, string> = {
   servercore: 'servercore',
   vmp: 'vmp-forge',
   vmpforge: 'vmp-forge',
+  verymanyplayers: 'vmp-forge',
+  verymanyplayersforge: 'vmp-forge',
   entityculling: 'entity-culling',
   morecullingreforged: 'more-culling-reforged',
   clumps: 'clumps',
@@ -157,6 +160,7 @@ const JAR_ALIASES: Record<string, string> = {
   drd: 'drd-dynamic-render-distance',
   dynamicrenderdistance: 'dynamicrenderdistance',
   lazydfu: 'lazydfu-forge',
+  lazydfuforge: 'lazydfu-forge',
   starlight: 'starlight-with-create-fix',
   starlightforge: 'starlight-with-create-fix',
   iris: 'iris-shaders',
@@ -169,6 +173,9 @@ const JAR_ALIASES: Record<string, string> = {
   clearlaggserver: 'clearlagg-server-forge',
   concurrentchunkmanagementengine: 'concurrent-chunk-management-engine-forge-c2me',
   concurrentchunkmanagementengineforgec2me: 'concurrent-chunk-management-engine-forge-c2me',
+  pfg: 'pfg',
+  alltheleaksmemoryleakfix: 'alltheleaks-memory-leak-fix',
+  capabilityfix: 'capability-fix',
 };
 
 const MOD_TOKEN_INDEX = (() => {

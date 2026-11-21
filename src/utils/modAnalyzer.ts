@@ -203,6 +203,7 @@ export const MOD_HARD_DEPENDENCIES: Record<string, string[]> = {
   'jeioptimizer': ['just-enough-items-jei'],
   'just-enough-freezes': ['just-enough-items-jei'],
   'just-enough-threads': ['just-enough-items-jei'],
+  'just-enough-loading': ['just-enough-items-jei'],
   'jeir-jei-rewired': ['just-enough-items-jei'],
   'controlling': ['searchables'],
   'toast-control': ['placebo'],
@@ -249,6 +250,7 @@ export const PURE_LIBRARY_MOD_IDS = new Set([
 ]);
 
 export function findModByDisplayName(name: string): ModItem | undefined {
+  if (name.trim().startsWith('.')) return undefined;
   const target = normalizeSlug(name);
   if (!target) return undefined;
   const exact = MODS_DATABASE.find(m => normalizeSlug(m.name) === target);
@@ -584,6 +586,42 @@ export function getRuleConflictingIds(modId: string): string[] {
       continue;
     }
 
+    if (rule.title.includes('ForceGL2.0-Remapped')) {
+      for (const m of MODS_DATABASE) {
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
+        if (mod.id === 'forcegl2-0-remapped') {
+          if (m.id !== 'forcegl2-0-remapped' && slugSet.has(ms)) conflicts.add(m.id);
+        } else if (m.id === 'forcegl2-0-remapped') {
+          conflicts.add(m.id);
+        }
+      }
+      continue;
+    }
+
+    if (rule.title.includes('Конфликт Indium через Sinytra')) {
+      for (const m of MODS_DATABASE) {
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
+        if (mod.id === 'indium') {
+          if (m.id !== 'indium' && slugSet.has(ms)) conflicts.add(m.id);
+        } else if (m.id === 'indium') {
+          conflicts.add(m.id);
+        }
+      }
+      continue;
+    }
+
+    if (rule.title.includes('Конфликт VulkanMod')) {
+      for (const m of MODS_DATABASE) {
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
+        if (mod.id === 'vulkanmod') {
+          if (m.id !== 'vulkanmod' && slugSet.has(ms)) conflicts.add(m.id);
+        } else if (m.id === 'vulkanmod') {
+          conflicts.add(m.id);
+        }
+      }
+      continue;
+    }
+
     for (const m of MODS_DATABASE) {
       if (m.id !== modId && slugSet.has(MOD_SLUG_BY_ID.get(m.id) || '')) {
         conflicts.add(m.id);
@@ -591,16 +629,74 @@ export function getRuleConflictingIds(modId: string): string[] {
     }
   }
 
-  const exclusive = getExclusivePoolForMod(modId);
-  if (exclusive) {
-    for (const pid of exclusive.poolIds) {
-      if (pid !== modId) conflicts.add(pid);
+  for (const poolIds of Object.values(EXCLUSIVE_ENGINE_POOLS)) {
+    if (poolIds.includes(modId)) {
+      for (const pid of poolIds) {
+        if (pid !== modId) conflicts.add(pid);
+      }
     }
   }
 
   const result = Array.from(conflicts);
   RULE_CONFLICT_CACHE.set(modId, result);
   return result;
+}
+
+const SOFT_OVERLAP_EVICTION_MAP: ReadonlyArray<[ReadonlyArray<string>, ReadonlyArray<string>]> = [
+  [['sodium-chloride'], ['sodium-embeddium-dynamic-lights']],
+  [['prismanium'], ['sodium-embeddium-dynamic-lights']],
+  [['geckolibbetterfps'], ['geckolib-animation-optimizer']],
+  [['dynamic-fps'], ['idle-boost', 'restmode']],
+  [['fast-recipe-search'], ['fastsuite']],
+  [['distant-horizons'], ['bobby-reforged', 'farsight']],
+  [['servercore'], ['adaptive-performance-tweaks', 'adaptive-optimization-reborn']],
+  [['mob-collision-off'], ['farmcollisionless', 'entity-collision-optimization']],
+  [['particle-core'], ['asyncparticles']],
+  [['immersive-optimization'], ['entitysleep', 'enttick', 'sleepium', 'martensite-entity-tick-skiper']],
+  [['gputape'], ['fix-gpu-memory-leak']],
+  [['stutterfix-reforged'], [...EXCLUSIVE_ENGINE_POOLS['thread-schedulers']]],
+  [['entity-culling'], ['itemculler', 'lcull', 'jem-adaptive-culling']],
+  [['more-culling-reforged'], ['fast-item-frames', 'culllessleaves-reforged']],
+  [['sodium-sightline'], ['oculus', 'emberlens', 'entity-culling', 'culllessleaves-reforged']],
+  [['sodium-fovea'], ['oculus', 'emberlens']],
+  [['sodium-streamline'], ['dynamic-fps', 'kerria']],
+  [
+    ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer', 'hc-harichunk'],
+    ['parallel-world-save', 'delta-chunk'],
+  ],
+  [['parallel-world-save'], ['delta-chunk']],
+  [['resourcepackcached'], ['keep-the-resourcepack', 'packforge']],
+  [['keep-the-resourcepack'], ['packforge']],
+  [['zstdnet'], ['krypton-reno']],
+  [
+    ['tritium'],
+    [
+      'enhanced-block-entities-reloaded',
+      'legendary-block-entities',
+      'fastchest-revived',
+      'enhanced-block-entities-reforged-unofficial',
+      'optimized-block-entities-obe',
+      'dynamic-fps',
+      'language-reload-reforged',
+      'languagereloadunofficial',
+    ],
+  ],
+];
+
+export function getSoftSlotOverlapEvictionIds(modId: string, activeSet: Set<string>): string[] {
+  const toEvict = new Set<string>();
+  for (const [sideA, sideB] of SOFT_OVERLAP_EVICTION_MAP) {
+    if (sideA.includes(modId)) {
+      for (const peer of sideB) {
+        if (peer !== modId && activeSet.has(peer)) toEvict.add(peer);
+      }
+    } else if (sideB.includes(modId)) {
+      for (const peer of sideA) {
+        if (peer !== modId && activeSet.has(peer)) toEvict.add(peer);
+      }
+    }
+  }
+  return Array.from(toEvict);
 }
 
 export function analyzeSelection(selectedIds: string[]) {
@@ -778,6 +874,60 @@ export function analyzeSelection(selectedIds: string[]) {
       );
       if (others.length > 0) {
         const matched = [clab, ...others];
+        matched.forEach(m => conflictingIdSet.add(m.id));
+        conflicts.push({
+          rule,
+          matchedIds: matched.map(m => m.id),
+          matchedNames: matched.map(m => m.name),
+        });
+      }
+      continue;
+    }
+
+    if (rule.title.includes('ForceGL2.0-Remapped')) {
+      const fgl = selectedMods.find(m => m.id === 'forcegl2-0-remapped');
+      if (!fgl) continue;
+      const others = selectedMods.filter(
+        m => m.id !== 'forcegl2-0-remapped' && slugSet.has(MOD_SLUG_BY_ID.get(m.id) || '')
+      );
+      if (others.length > 0) {
+        const matched = [fgl, ...others];
+        matched.forEach(m => conflictingIdSet.add(m.id));
+        conflicts.push({
+          rule,
+          matchedIds: matched.map(m => m.id),
+          matchedNames: matched.map(m => m.name),
+        });
+      }
+      continue;
+    }
+
+    if (rule.title.includes('Конфликт Indium через Sinytra')) {
+      const ind = selectedMods.find(m => m.id === 'indium');
+      if (!ind) continue;
+      const others = selectedMods.filter(
+        m => m.id !== 'indium' && slugSet.has(MOD_SLUG_BY_ID.get(m.id) || '')
+      );
+      if (others.length > 0) {
+        const matched = [ind, ...others];
+        matched.forEach(m => conflictingIdSet.add(m.id));
+        conflicts.push({
+          rule,
+          matchedIds: matched.map(m => m.id),
+          matchedNames: matched.map(m => m.name),
+        });
+      }
+      continue;
+    }
+
+    if (rule.title.includes('Конфликт VulkanMod')) {
+      const vlk = selectedMods.find(m => m.id === 'vulkanmod');
+      if (!vlk) continue;
+      const others = selectedMods.filter(
+        m => m.id !== 'vulkanmod' && slugSet.has(MOD_SLUG_BY_ID.get(m.id) || '')
+      );
+      if (others.length > 0) {
+        const matched = [vlk, ...others];
         matched.forEach(m => conflictingIdSet.add(m.id));
         conflicts.push({
           rule,

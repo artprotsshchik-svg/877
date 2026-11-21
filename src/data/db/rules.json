@@ -635,6 +635,74 @@
     ],
     "explanation": "Оба мода перехватывают и оптимизируют диспетчеризацию Forge EventBus / клиентских событий. Одновременная установка создаёт двойной перехват обработчиков и риск сбоев модовых событий.",
     "recommendation": "Оставьте максимум один из них (в современной сборке с ModernFix и Radium обычно не требуется ни один)."
+  },
+  {
+    "title": "Конфликт ForceGL2.0-Remapped с современным OpenGL-рендером",
+    "category": "Рендер, culling и FPS",
+    "conflictingMods": [
+      "ForceGL2.0-Remapped",
+      "Embeddium",
+      "Emberbium",
+      "Xenon",
+      "Xenon Debloated",
+      "Rubidium",
+      "Prismanium",
+      "Polidium",
+      "Oculus",
+      "Emberlens",
+      "Alloyium",
+      "Nvidium",
+      "Accelerated Rendering",
+      "Accelerated Rendering: Turned",
+      "Flerovium",
+      "Distant Horizons",
+      "GPUTape",
+      "ImmediatelyFast"
+    ],
+    "explanation": "ForceGL2.0-Remapped принудительно переводит клиент на устаревший OpenGL 2.0, тогда как Minecraft 1.17+ требует OpenGL 3.2+, а Embeddium, шейдеры и Compute/Mesh-аддоны — OpenGL 4.3–4.6. Совместный запуск приводит к немедленному крашу.",
+    "recommendation": "Полностью удалите ForceGL2.0-Remapped из любой сборки на 1.20.1."
+  },
+  {
+    "title": "Конфликт Indium через Sinytra с Embeddium/Oculus",
+    "category": "Фиксы и совместимость",
+    "conflictingMods": [
+      "Indium",
+      "Embeddium",
+      "Emberbium",
+      "Xenon",
+      "Xenon Debloated",
+      "Rubidium",
+      "Prismanium",
+      "Polidium",
+      "Oculus",
+      "Emberlens",
+      "Sinytra Connector",
+      "Forgified Fabric API"
+    ],
+    "explanation": "Indium предназначен только для оригинального Fabric Sodium. Embeddium и Emberbium уже нативно реализуют нужные интерфейсы рендеринга (FRAPI), поэтому установка Indium поверх Sinytra Connector или с рендер-ядрами Forge вызывает дублирование и краши.",
+    "recommendation": "Удалите Indium — на Forge 1.20.1 его полностью заменяет Embeddium (+ Forgified Fabric API)."
+  },
+  {
+    "title": "Конфликт VulkanMod с OpenGL-шейдерами, аддонами и Sinytra Connector",
+    "category": "Рендер, culling и FPS",
+    "conflictingMods": [
+      "VulkanMod",
+      "Oculus",
+      "Emberlens",
+      "Iris Shaders",
+      "Sinytra Connector",
+      "Forgified Fabric API",
+      "Nvidium",
+      "Alloyium",
+      "Accelerated Rendering",
+      "Accelerated Rendering: Turned",
+      "Flerovium",
+      "ImmediatelyFast",
+      "Distant Horizons",
+      "GPUTape"
+    ],
+    "explanation": "VulkanMod полностью заменяет рендерер OpenGL на Vulkan API под чистый Fabric и не поддерживает Forge, Sinytra Connector, OpenGL-аддоны и классические шейдеры Oculus/Iris.",
+    "recommendation": "На Forge 1.20.1 полностью удалите VulkanMod и используйте Embeddium или Emberbium."
   }
 ]
 
