@@ -56,7 +56,10 @@ const JAR_ALIASES: Record<string, string> = {
   sodiumoptionsapi: 'sodium-embeddium-options-api',
   sodiumchloride: 'sodium-chloride',
   chloride: 'sodium-chloride',
+  embeddiumplus: 'sodium-chloride',
+  embeddiumplusplus: 'sodium-chloride',
   embeddiumextras: 'embeddium-extras',
+  textruesembeddiumoptions: 'embeddium-extras',
   solix: 'solix',
   lightstar: 'lightstar',
   structurelayoutoptimizer: 'structure-layout-optimizer',
@@ -66,6 +69,7 @@ const JAR_ALIASES: Record<string, string> = {
   connectivity: 'connectivity',
   cupboard: 'cupboard',
   kryptonreno: 'krypton-reno',
+  kryptonreforged: 'krypton-reno',
   kryptonhybrid: 'krypton-hybrid',
   pluto: 'pluto',
   servercore: 'servercore',
@@ -124,6 +128,7 @@ const JAR_ALIASES: Record<string, string> = {
   papi: 'put-a-plug-in-it-papi',
   putapluginit: 'put-a-plug-in-it-papi',
   fallingblocksfpsfix: 'falling-blocks-fps-fix',
+  gravelfpsfix: 'falling-blocks-fps-fix',
   structuredfucache: 'structure-dfu-cache',
   configured: 'configured',
   controlling: 'controlling',
@@ -227,8 +232,15 @@ export function matchJarFilenamesToMods(jarFiles: string[]): {
     }
 
     let partialHit: ModItem | undefined;
-    for (const [aliasKey, modId] of Object.entries(JAR_ALIASES)) {
+    const sortedAliases = Object.entries(JAR_ALIASES).sort((a, b) => b[0].length - a[0].length);
+    const VARIANT_SUFFIX_RE =
+      /^(plus|extra|extras|addon|fix|compat|turned|reloaded|reforged|reforked|border|mapper|options|lights|culling|optimizer|tweaks|config|api|core|cache|hybrid|foxified|debloated)/;
+    for (const [aliasKey, modId] of sortedAliases) {
       if (aliasKey.length >= 4 && token.startsWith(aliasKey) && token.length - aliasKey.length <= 6) {
+        const suffix = token.slice(aliasKey.length);
+        if (suffix && VARIANT_SUFFIX_RE.test(suffix)) {
+          continue;
+        }
         matchedSet.add(modId);
         partialHit = MODS_DATABASE.find(m => m.id === modId);
         break;

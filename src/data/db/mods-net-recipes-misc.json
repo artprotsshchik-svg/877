@@ -2150,7 +2150,10 @@
     "isGroupLeader": false,
     "isGroupAddon": false,
     "addons": [],
-    "coveredBy": ""
+    "coveredBy": "",
+    "supersededBy": [
+      "compact-f3-plus"
+    ]
   },
   {
     "id": "infooverlay77",
@@ -2162,7 +2165,7 @@
     "statusLabel": "Оверлей информации",
     "healthTier": "yellow",
     "description": "Компактный информационный оверлей координат, FPS и биома.",
-    "bestAlternative": "Improved F3.",
+    "bestAlternative": "Compact F3 Plus.",
     "warning": "",
     "tags": [],
     "curseforgeUrl": "https://www.curseforge.com/minecraft/search?search=InfoOverlay77&class=mc-mods",
@@ -2173,7 +2176,7 @@
     "addons": [],
     "coveredBy": "",
     "supersededBy": [
-      "improved-f3"
+      "compact-f3-plus"
     ]
   },
   {
@@ -2525,7 +2528,7 @@
     "category": "Сеть",
     "platform": "Forge",
     "installed": false,
-    "status": "useful",
+    "status": "redundant",
     "statusLabel": "Избыточен на 1.20.1",
     "healthTier": "yellow",
     "description": "Принудительно включает флаг TCP_NODELAY в Netty. На современном Minecraft 1.20.1 и Krypton Reno TCP_NODELAY уже включён по умолчанию, поэтому мод давно избыточен.",

@@ -94,13 +94,13 @@
       "Alloyium",
       "Revidium / Acedium",
       "Maple Mesh Render",
-      "Sodium Sightline",
-      "Sodium Streamline",
-      "Sodium Fovea",
+      "(Sodium) Sightline",
+      "(Sodium) Streamline",
+      "(Sodium) Fovea",
       "Cullify",
       "Sodium/Embeddium Leaf Culling",
       "GeckolibBetterFPS",
-      "Embeddium x Polytone Block Colormap Fix (Polytone)"
+      "Embeddium x Polytone Block Colormap Fix (только с Polytone)"
     ],
     "explanation": "Emberbium переписывает внутреннее устройство Embeddium (Radix Sort и структуру мешей), из-за чего жёстко привязанные к Embeddium 0.3.31 моды (Oculus, Faster Iris Shadow Mapper, GGTU, Alloyium, Acedium, Maple Mesh Render, Sightline/Streamline/Fovea, Cullify, GeckolibBetterFPS) с ним несовместимы.",
     "recommendation": "Для Oculus, Alloyium и узкоспециализированных аддонов Embeddium 0.3.31 используйте классический Embeddium; для Emberbium используйте Nvidium (.connector), Flerovium, Chloride, Kerria или Emberlens."
@@ -350,7 +350,7 @@
     "recommendation": "Для Forge 1.20.1 используйте исключительно Distant Horizons (+ Distant Horizons Memory Fix)."
   },
   {
-    "title": "Конфликт 3D-апскейлеров разрешения (AMD FSR ↔ RenderScale / Super Resolution / PureScale / GGTU)",
+    "title": "Конфликт 3D-апскейлеров разрешения (AMD FSR ↔ RenderScale / Super Resolution / PureScale / Fovea / GGTU)",
     "category": "Апскейл и генерация кадров",
     "conflictingMods": [
       "AMD FSR Upscaler & Render Scale (for Embeddium)",
@@ -358,9 +358,10 @@
       "Super Resolution",
       "Purescale",
       "UpscaleCraft (Forge)",
-      "GGTU"
+      "GGTU",
+      "(Sodium) Fovea"
     ],
-    "explanation": "Все эти моды перехватывают масштаб буфера рендеринга 3D-мира. Установка нескольких апскейлеров одновременно приводит к двойному сжатию кадра, артефактам шейдеров или поломке масштаба интерфейса.",
+    "explanation": "Все эти моды перехватывают масштаб буфера или периферийное разрешение 3D-рендера. Установка нескольких апскейлеров одновременно приводит к двойному сжатию кадра, артефактам шейдеров или поломке масштаба интерфейса.",
     "recommendation": "Оставьте максимум один апскейлер (лучше AMD FSR Upscaler для Embeddium)."
   },
   {
@@ -624,6 +625,16 @@
     ],
     "explanation": "CLab перехватывает граф видимости и отсечения блоков и листвы, конфликтуя с выделенными модами куллинга листвы (артефакты крон и мигание граней).",
     "recommendation": "Отключите CLab и используйте проверенную пару Entity Culling + CullLessLeaves Reforged."
+  },
+  {
+    "title": "Дублирование перехватчиков шины событий (FastEvent ↔ Fast Events)",
+    "category": "Рендер, culling и FPS",
+    "conflictingMods": [
+      "Fast Events",
+      "FastEvent"
+    ],
+    "explanation": "Оба мода перехватывают и оптимизируют диспетчеризацию Forge EventBus / клиентских событий. Одновременная установка создаёт двойной перехват обработчиков и риск сбоев модовых событий.",
+    "recommendation": "Оставьте максимум один из них (в современной сборке с ModernFix и Radium обычно не требуется ни один)."
   }
 ]
 

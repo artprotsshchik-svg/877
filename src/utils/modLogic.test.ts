@@ -2646,3 +2646,105 @@ test('Blocks 1-4 technical audit: Fastload/Ksyxis, SuperChunk/CLab asymmetric ru
     assert.ok(sum.assemblyScore >= 96, `${preset.id}: expected score >= 96, got ${sum.assemblyScore}`);
   }
 });
+
+test('deep audit fixes: exact rule resolution, transitive superseder chains, FastEvent/Fovea/MoreCulling overlaps, VoidEngine/TCP Nodeway, and JAR prefix matching', async () => {
+  const { INCOMPATIBILITY_RULES, MODS_DATABASE } = await import('../data/modsData.ts');
+  const { analyzeSelection, getModSuperseder, getCheckerTier, isOutdatedOrUselessMod, evaluateModImpactInPack, evaluateDubiousMods } = await import('./modAnalyzer.ts');
+  const { smartFixAssembly } = await import('./modBuilder.ts');
+  const { matchJarFilenamesToMods } = await import('./jarMatcher.ts');
+
+  const byId = new Map(MODS_DATABASE.map(m => [m.id, m]));
+
+  // 1. Every conflictingMod entry in rules.json resolves cleanly by exact display name in MODS_DATABASE
+  const dbExactNames = new Set(MODS_DATABASE.map(m => m.name));
+  const unresolvedExact: string[] = [];
+  for (const rule of INCOMPATIBILITY_RULES) {
+    for (const cname of rule.conflictingMods) {
+      if (!dbExactNames.has(cname)) {
+        unresolvedExact.push(`${rule.title} -> ${cname}`);
+      }
+    }
+  }
+  assert.deepEqual(unresolvedExact, [], `Unresolved exact mod names in rules.json: ${unresolvedExact.join(', ')}`);
+
+  // 2. FastEvent vs Fast Events conflict & smartFix resolution
+  const fastEvAn = analyzeSelection(['fastevent', 'fast-events']);
+  assert.ok(fastEvAn.conflicts.some(c => c.matchedIds.includes('fastevent') && c.matchedIds.includes('fast-events')));
+  const fixedFastEv = smartFixAssembly(['fastevent', 'fast-events']);
+  assert.equal(['fastevent', 'fast-events'].filter(id => fixedFastEv.includes(id)).length, 1);
+
+  // 3. (Sodium) Fovea conflicts with 3D upscalers & warns with shaders
+  const foveaFsr = analyzeSelection(['embeddium', 'sodium-fovea', 'amd-fsr-upscaler-render-scale-for-embeddium']);
+  assert.ok(foveaFsr.conflicts.some(c => c.matchedIds.includes('sodium-fovea') && c.matchedIds.includes('amd-fsr-upscaler-render-scale-for-embeddium')));
+  const foveaShader = analyzeSelection(['embeddium', 'oculus', 'sodium-fovea']);
+  assert.ok(foveaShader.warnings.some(w => w.modId === 'sodium-fovea' && w.severity === 'yellow'));
+  const fixedFoveaShader = smartFixAssembly(['embeddium', 'oculus', 'sodium-fovea']);
+  assert.ok(fixedFoveaShader.includes('oculus') && !fixedFoveaShader.includes('sodium-fovea'));
+
+  // 4. More Culling + CullLessLeaves Reforged overlap & Sightline/Streamline overlaps
+  const moreLeafAn = analyzeSelection(['embeddium', 'more-culling-reforged', 'culllessleaves-reforged']);
+  assert.ok(moreLeafAn.warnings.some(w => w.modId === 'more-culling-reforged' && w.severity === 'yellow'));
+  const sightlineEc = analyzeSelection(['embeddium', 'entity-culling', 'sodium-sightline']);
+  assert.ok(sightlineEc.warnings.some(w => w.modId === 'sodium-sightline' && w.severity === 'yellow'));
+  const streamlineDyn = analyzeSelection(['embeddium', 'dynamic-fps', 'sodium-streamline']);
+  assert.ok(streamlineDyn.warnings.some(w => w.modId === 'sodium-streamline' && w.severity === 'yellow'));
+
+  // 5. Transitive superseder chains (smart-particles -> particull -> particle-core, infooverlay77 -> improved-f3 -> compact-f3-plus)
+  const particleCoreSet = new Set(['particle-core']);
+  assert.ok(getModSuperseder(byId.get('smart-particles')!, particleCoreSet)?.isActiveInSelection);
+  assert.ok(getModSuperseder(byId.get('emberdust-particle-cutter')!, particleCoreSet)?.isActiveInSelection);
+  const compactF3Set = new Set(['compact-f3-plus']);
+  assert.ok(getModSuperseder(byId.get('infooverlay77')!, compactF3Set)?.isActiveInSelection);
+  assert.ok(getModSuperseder(byId.get('improved-f3')!, compactF3Set)?.isActiveInSelection);
+
+  // smartFixAssembly over ALL mods leaves zero chain leaks or overlapping bloat
+  const fixedAll = smartFixAssembly(MODS_DATABASE.map(m => m.id));
+  const fixedAllSet = new Set(fixedAll);
+  for (const leakId of [
+    'smart-particles',
+    'emberdust-particle-cutter',
+    'infooverlay77',
+    'improved-f3',
+    'fastevent',
+    'sodium-fovea',
+    'sodium-sightline',
+    'sodium-streamline',
+    'voidengine',
+    'more-culling-reforged',
+    'stablecap-pacer-forge-1-19-2',
+  ]) {
+    assert.ok(!fixedAllSet.has(leakId), `smartFixAssembly(ALL) unexpectedly retained ${leakId}`);
+  }
+  const fixedAllAnalysis = analyzeSelection(fixedAll);
+  assert.equal(fixedAllAnalysis.conflicts.length, 0);
+  assert.equal(fixedAllAnalysis.warnings.filter(w => w.severity === 'red').length, 0);
+
+  // 6. VoidEngine Fabric-only classification, TCP Nodeway redundant status, Accelerated Rendering + shaders caveat
+  assert.equal(getCheckerTier(byId.get('voidengine')!).tier, 'red');
+  assert.deepEqual(smartFixAssembly(['voidengine']), ['embeddium']);
+  assert.equal(isOutdatedOrUselessMod(byId.get('tcp-nodeway')!), true);
+
+  const arShaders = evaluateModImpactInPack(
+    byId.get('accelerated-rendering')!,
+    new Set(['embeddium', 'oculus', 'accelerated-rendering'])
+  );
+  assert.ok(arShaders.interactions.some(i => i.kind === 'context' && i.summary.includes('acceleratedrendering-client.toml')));
+  const arDubious = evaluateDubiousMods(['embeddium', 'oculus', 'accelerated-rendering']);
+  assert.ok(arDubious.some(d => d.modId === 'accelerated-rendering' && d.severity === 'low'));
+
+  // 7. JAR matcher: real filenames resolve accurately and suffix variants don't falsely steal base mods
+  const jarMatch = matchJarFilenamesToMods([
+    'embeddiumplus-1.20.1-v1.2.13.jar',
+    'GravelFPSFix-1.5.4.jar',
+    'KryptonReforged-0.2.3.jar',
+    'textrues_embeddium_options-0.1.5+mc1.20.1.jar',
+    'rubidium-extra-0.5.4.4+mc1.20.1-build.131.jar',
+  ]);
+  for (const expected of ['sodium-chloride', 'falling-blocks-fps-fix', 'krypton-reno', 'embeddium-extras']) {
+    assert.ok(jarMatch.matchedIds.includes(expected), `Expected JAR matcher to resolve ${expected}`);
+  }
+  assert.ok(!jarMatch.matchedIds.includes('rubidium'), 'rubidium-extra must NOT falsely match base rubidium');
+  assert.ok(!jarMatch.matchedIds.includes('embeddium'), 'embeddiumplus must match sodium-chloride, not base embeddium');
+  assert.ok(jarMatch.unmatchedJars.includes('rubidium-extra-0.5.4.4+mc1.20.1-build.131.jar'));
+});
+

@@ -495,7 +495,7 @@
       "hp-hariplayer",
       "fast-ip-ping"
     ],
-    "conflictReason": "Опасные моды вроде Multithreading вызывают гонки данных; используйте связку Ixeris + ThreadTweak Reforged."
+    "conflictReason": "Опасные моды вроде Multithreading вызывают гонки данных; используйте Ixeris (поток ввода) + СТРОГО ОДИН планировщик (StutterFix-Reforged ИЛИ ThreadTweak Reforged — не совмещайте их с Smooth Boot Reloaded)."
   },
   {
     "id": "boot-loading",

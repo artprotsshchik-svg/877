@@ -878,6 +878,10 @@ export function smartFixAssembly(selectedIds: string[], prefs?: AssemblyPreferen
     if (focusId === 'more-culling-reforged') next.delete('fast-item-frames');
     else next.delete('more-culling-reforged');
   }
+  if (next.has('more-culling-reforged') && next.has('culllessleaves-reforged')) {
+    if (focusId === 'more-culling-reforged') next.delete('culllessleaves-reforged');
+    else next.delete('more-culling-reforged');
+  }
 
   if (next.has('sodium-sightline') && (next.has('oculus') || next.has('emberlens'))) {
     if (focusId === 'sodium-sightline') {
@@ -885,6 +889,30 @@ export function smartFixAssembly(selectedIds: string[], prefs?: AssemblyPreferen
       next.delete('emberlens');
     } else {
       next.delete('sodium-sightline');
+    }
+  }
+  if (next.has('sodium-sightline') && (next.has('entity-culling') || next.has('culllessleaves-reforged'))) {
+    if (focusId === 'sodium-sightline') {
+      next.delete('entity-culling');
+      next.delete('culllessleaves-reforged');
+    } else {
+      next.delete('sodium-sightline');
+    }
+  }
+  if (next.has('sodium-fovea') && (next.has('oculus') || next.has('emberlens'))) {
+    if (focusId === 'sodium-fovea') {
+      next.delete('oculus');
+      next.delete('emberlens');
+    } else {
+      next.delete('sodium-fovea');
+    }
+  }
+  if (next.has('sodium-streamline') && (next.has('dynamic-fps') || next.has('kerria'))) {
+    if (focusId === 'sodium-streamline') {
+      next.delete('dynamic-fps');
+      next.delete('kerria');
+    } else {
+      next.delete('sodium-streamline');
     }
   }
 
@@ -1019,6 +1047,14 @@ export function smartFixAssembly(selectedIds: string[], prefs?: AssemblyPreferen
       next.delete('emberlens');
     } else {
       next.delete('sodium-sightline');
+    }
+  }
+  if (next.has('sodium-fovea') && (next.has('oculus') || next.has('emberlens'))) {
+    if (focusId === 'sodium-fovea') {
+      next.delete('oculus');
+      next.delete('emberlens');
+    } else {
+      next.delete('sodium-fovea');
     }
   }
   if (

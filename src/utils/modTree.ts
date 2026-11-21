@@ -78,6 +78,10 @@ const ADDON_PARENT_PRIORITY: Record<string, { parents: string[]; relation: strin
     parents: ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer', 'hc-harichunk'],
     relation: 'Дубль I/O чанков',
   },
+  'concurrent-world-gen': {
+    parents: ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer'],
+    relation: 'Дубль потоков генерации',
+  },
   'delta-chunk': {
     parents: ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer', 'hc-harichunk', 'parallel-world-save'],
     relation: 'Дубль I/O чанков',
@@ -91,6 +95,11 @@ const ADDON_PARENT_PRIORITY: Record<string, { parents: string[]; relation: strin
   'improved-f3': { parents: ['compact-f3-plus'], relation: 'Дубль экрана F3' },
   'infooverlay77': { parents: ['compact-f3-plus'], relation: 'Оверлей F3' },
   'stutterfix-modern-port': { parents: ['stutterfix-reforged'], relation: 'Дубль порта' },
+  'threadtweak-reforged': { parents: ['stutterfix-reforged', 'smooth-boot-reloaded'], relation: 'Конкурирующий планировщик' },
+  'threads': { parents: ['threadtweak-reforged', 'smooth-boot-reloaded', 'stutterfix-reforged'], relation: 'Дубль приоритетов' },
+  'thread-priorities': { parents: ['threadtweak-reforged', 'smooth-boot-reloaded', 'stutterfix-reforged'], relation: 'Дубль приоритетов' },
+  'thread-tweaks': { parents: ['threadtweak-reforged', 'smooth-boot-reloaded', 'stutterfix-reforged'], relation: 'Дубль приоритетов' },
+  'worker-threads': { parents: ['threadtweak-reforged', 'smooth-boot-reloaded', 'stutterfix-reforged'], relation: 'Дубль пула потоков' },
   'languagereloadunofficial': { parents: ['language-reload-reforged'], relation: 'Дубль порта' },
   'capability-fix': { parents: ['capability-fix-revived'], relation: 'Устаревшая версия' },
   'furnaceoptimizer': { parents: ['fastfurnace'], relation: 'Дубль печей' },

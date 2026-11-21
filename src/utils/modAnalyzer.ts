@@ -119,6 +119,7 @@ export const EXCLUSIVE_ENGINE_POOLS: Record<string, string[]> = {
     'purescale',
     'upscalecraft-forge',
     'ggtu',
+    'sodium-fovea',
   ],
   'clearlag-sweepers': [
     'tct-clearlag',
@@ -141,6 +142,7 @@ export const EXCLUSIVE_ENGINE_POOLS: Record<string, string[]> = {
   'splash-screen-hooks': ['smooth-loading-screens', 'early-loading-screen', 'splashscreen'],
   'entity-tick-sleep': ['entitysleep', 'enttick', 'sleepium', 'martensite-entity-tick-skiper'],
   'boot-spawn-loader': ['fastload', 'ksyxis'],
+  'event-bus': ['fast-events', 'fastevent'],
   'thread-schedulers': [
     'threadtweak-reforged',
     'smooth-boot-reloaded',
@@ -263,6 +265,7 @@ export const FABRIC_TO_FORGE_SWAP: Record<string, string> = {
   'lithium': 'radium-re-reforged',
   'krypton': 'krypton-reno',
   'sodium': 'embeddium',
+  'voidengine': 'embeddium',
   'iris-shaders': 'oculus',
   'very-many-players-vmp': 'vmp-forge',
   'c2me-concurrent-chunk-management-engine': 'concurrent-chunk-management-engine-forge-c2me',
@@ -1215,12 +1218,49 @@ export function analyzeSelection(selectedIds: string[]) {
     });
   }
 
-  if (selectedSet.has('sodium-sightline') && (selectedSet.has('oculus') || selectedSet.has('emberlens'))) {
+  if (selectedSet.has('more-culling-reforged') && selectedSet.has('culllessleaves-reforged')) {
     warnings.push({
-      modId: 'sodium-sightline',
-      modName: 'Sodium Sightline',
+      modId: 'more-culling-reforged',
+      modName: 'More Culling Reforged',
       severity: 'yellow',
-      message: 'Sodium Sightline (ранее Fovea/Streamline, усечение бокового FOV) при работе с шейдерами Oculus/Emberlens может обрезать боковые тени и отражения.',
+      message: 'Пересечение с CullLessLeaves Reforged: отключите куллинг листвы в config/moreculling.toml (leavesCullingMode = "DEFAULT").',
+    });
+  }
+
+  if (selectedSet.has('sodium-sightline')) {
+    if (selectedSet.has('oculus') || selectedSet.has('emberlens')) {
+      warnings.push({
+        modId: 'sodium-sightline',
+        modName: '(Sodium) Sightline',
+        severity: 'yellow',
+        message: '(Sodium) Sightline при работе с шейдерами Oculus/Emberlens может ломать проходы теней (shadow pass) и вызывать мигание мира.',
+      });
+    }
+    if (selectedSet.has('entity-culling') || selectedSet.has('culllessleaves-reforged')) {
+      warnings.push({
+        modId: 'sodium-sightline',
+        modName: '(Sodium) Sightline',
+        severity: 'yellow',
+        message: 'Частичное пересечение куллинга: (Sodium) Sightline дублирует отсечение сущностей Entity Culling и листвы CullLessLeaves Reforged.',
+      });
+    }
+  }
+
+  if (selectedSet.has('sodium-fovea') && (selectedSet.has('oculus') || selectedSet.has('emberlens'))) {
+    warnings.push({
+      modId: 'sodium-fovea',
+      modName: '(Sodium) Fovea',
+      severity: 'yellow',
+      message: '(Sodium) Fovea масштабирует периферийное разрешение и дистанцию сущностей — с шейдерами Oculus/Emberlens возможны артефакты теней и краёв кадра.',
+    });
+  }
+
+  if (selectedSet.has('sodium-streamline') && (selectedSet.has('dynamic-fps') || selectedSet.has('kerria'))) {
+    warnings.push({
+      modId: 'sodium-streamline',
+      modName: '(Sodium) Streamline',
+      severity: 'yellow',
+      message: 'Частичное пересечение: (Sodium) Streamline дублирует лимит FPS в фоне Dynamic FPS и заморозку статичных текстур Kerria.',
     });
   }
 
@@ -1524,9 +1564,12 @@ export function getModSuperseder(
   mod: ModItem,
   selectedSet?: Set<string>,
   prefs?: AssemblyPreferences,
-  allowGlobalSupersede = false
+  allowGlobalSupersede = false,
+  visited: Set<string> = new Set()
 ): SupersederInfo | null {
   const activeSet = selectedSet ?? new Set<string>();
+  const nextVisited = new Set(visited);
+  nextVisited.add(mod.id);
 
   if (mod.supersededWhenAll && mod.supersededWhenAll.length > 0) {
     if (mod.supersededWhenAll.every(id => activeSet.has(id))) {
@@ -1550,6 +1593,26 @@ export function getModSuperseder(
       };
     }
 
+    const transitiveActiveNames: string[] = [];
+    for (const sid of mod.supersededBy) {
+      if (nextVisited.has(sid)) continue;
+      const target = MOD_BY_ID.get(sid);
+      if (!target) continue;
+      const nested = getModSuperseder(target, activeSet, prefs, false, nextVisited);
+      if (nested?.isActiveInSelection) {
+        for (const name of nested.byNames) {
+          if (!transitiveActiveNames.includes(name)) transitiveActiveNames.push(name);
+        }
+      }
+    }
+    if (transitiveActiveNames.length > 0) {
+      return {
+        byNames: transitiveActiveNames,
+        isActiveInSelection: true,
+        reason: `полностью перекрывается более лучшим: ${transitiveActiveNames.join(' / ')}`,
+      };
+    }
+
     if (allowGlobalSupersede) {
       const viableBest = mod.supersededBy.filter(id => {
         const bm = MOD_BY_ID.get(id);
@@ -1565,6 +1628,19 @@ export function getModSuperseder(
           isActiveInSelection: false,
           reason: `есть более совершенный аналог: ${names.join(' / ')}`,
         };
+      }
+      for (const sid of mod.supersededBy) {
+        if (nextVisited.has(sid)) continue;
+        const target = MOD_BY_ID.get(sid);
+        if (!target) continue;
+        const nestedGlobal = getModSuperseder(target, activeSet, prefs, true, nextVisited);
+        if (nestedGlobal) {
+          return {
+            byNames: nestedGlobal.byNames,
+            isActiveInSelection: nestedGlobal.isActiveInSelection,
+            reason: `есть более совершенный аналог: ${nestedGlobal.byNames.join(' / ')}`,
+          };
+        }
       }
     }
   }
@@ -3679,7 +3755,19 @@ export function evaluateDubiousMods(
       (selectedSet.has('oculus') || selectedSet.has('emberlens'))
     ) {
       severity = 'medium';
-      reason = 'С шейдерами Oculus/Emberlens сужение бокового обзора Sodium Sightline может вызывать пропадание боковых теней и отражений.';
+      reason = 'С шейдерами Oculus/Emberlens (Sodium) Sightline может ломать проходы теней и вызывать мигание мира.';
+    } else if (
+      mod.id === 'sodium-fovea' &&
+      (selectedSet.has('oculus') || selectedSet.has('emberlens'))
+    ) {
+      severity = 'medium';
+      reason = 'С шейдерами Oculus/Emberlens периферийное масштабирование (Sodium) Fovea может вызывать артефакты теней и краёв кадра.';
+    } else if (
+      mod.id === 'accelerated-rendering' &&
+      (selectedSet.has('oculus') || selectedSet.has('emberlens'))
+    ) {
+      severity = 'low';
+      reason = 'В паре с шейдерами Oculus/Emberlens проверьте настройки в config/acceleratedrendering-client.toml (для GeckoLib может потребоваться MixinBooster; рекомендуется Java 21).';
     } else if (
       mod.id === 'distant-horizons' &&
       (selectedSet.has('concurrent-chunk-management-engine-forge-c2me') ||
@@ -3979,6 +4067,15 @@ function computePackScoreInternal(
   }
   if (selectedSet.has('sodium-sightline') && (selectedSet.has('oculus') || selectedSet.has('emberlens'))) {
     penalty += 2;
+  }
+  if (selectedSet.has('sodium-sightline') && (selectedSet.has('entity-culling') || selectedSet.has('culllessleaves-reforged'))) {
+    penalty += 1.5;
+  }
+  if (selectedSet.has('sodium-fovea') && (selectedSet.has('oculus') || selectedSet.has('emberlens'))) {
+    penalty += 2;
+  }
+  if (selectedSet.has('sodium-streamline') && (selectedSet.has('dynamic-fps') || selectedSet.has('kerria'))) {
+    penalty += 1.5;
   }
   if (selectedSet.has('dynamic-fps') && (selectedSet.has('restmode') || selectedSet.has('idle-boost'))) penalty += 1.5;
   if (selectedSet.has('particle-core') && selectedSet.has('particull')) penalty += 1.5;
@@ -4339,17 +4436,29 @@ export function evaluateModImpactInPack(
     addSynergy(['embeddium'], 'Ускоряет видимость чанков на GPU через OpenGL Compute; полностью совместим с Oculus и работает без Sinytra', 130);
   } else if (mod.id === 'accelerated-rendering') {
     if (hasRenderCore) {
+      const withShaders = withoutSet.has('oculus') || withoutSet.has('emberlens');
       interactions.push({
         kind: 'context',
         targetIds: [],
         targetNames: [],
-        summary: 'Сильный буст FPS только на GPU 8+ ГБ VRAM (OpenGL 4.6) при сотнях анимированных мобов; на 4–6 ГБ VRAM риск переполнения',
+        summary: withShaders
+          ? 'С шейдерами Oculus/Emberlens проверьте config/acceleratedrendering-client.toml (для GeckoLib нужен MixinBooster); рекомендуется Java 21 и GPU с 8+ ГБ VRAM'
+          : 'Сильный буст FPS только на GPU 8+ ГБ VRAM (OpenGL 4.6) при сотнях анимированных мобов; на 4–6 ГБ VRAM риск переполнения',
         impactDelta: 40,
       });
       delta += 40;
     }
-  } else if (mod.id === 'sodium-sightline' && (withoutSet.has('oculus') || withoutSet.has('emberlens'))) {
-    addOverlap(['oculus', 'emberlens'], 'При игре с шейдерами усечение бокового FOV может срезать боковые тени и отражения', -90);
+  } else if (mod.id === 'sodium-sightline') {
+    if (withoutSet.has('oculus') || withoutSet.has('emberlens')) {
+      addOverlap(['oculus', 'emberlens'], 'При игре с шейдерами (Sodium) Sightline может ломать проходы теней (shadow pass) и вызывать мигание мира', -90);
+    }
+    if (withoutSet.has('entity-culling') || withoutSet.has('culllessleaves-reforged')) {
+      addOverlap(['entity-culling', 'culllessleaves-reforged'], 'Дублирует отсечение сущностей Entity Culling и листвы CullLessLeaves Reforged', -70);
+    }
+  } else if (mod.id === 'sodium-fovea' && (withoutSet.has('oculus') || withoutSet.has('emberlens'))) {
+    addOverlap(['oculus', 'emberlens'], 'Периферийное масштабирование (Sodium) Fovea может вызывать артефакты теней и краёв экрана с шейдерами', -90);
+  } else if (mod.id === 'sodium-streamline' && (withoutSet.has('dynamic-fps') || withoutSet.has('kerria'))) {
+    addOverlap(['dynamic-fps', 'kerria'], 'Частично дублирует фоновый лимит FPS Dynamic FPS и заморозку текстур Kerria', -60);
   }
 
   // Embeddium Extras vs Chloride partial overlap (without failing Test 4 warnings)
@@ -4366,7 +4475,7 @@ export function evaluateModImpactInPack(
   // Culling 3-layer synergy
   if (mod.id === 'entity-culling') {
     addSynergy(['culllessleaves-reforged', 'enhanced-block-entities-reloaded', 'more-culling-reforged'], 'Трёхслойный куллинг: сущности за стенами + невидимые грани/рамки + запечённые сундуки', 140);
-    addOverlap(['itemculler', 'lcull', 'jem-adaptive-culling'], 'Частичное пересечение: Entity Culling уже скрывает невидимые предметы и сущности за стенами', -40);
+    addOverlap(['itemculler', 'lcull', 'jem-adaptive-culling', 'sodium-sightline'], 'Частичное пересечение: Entity Culling уже скрывает невидимые предметы и сущности за стенами', -40);
   } else if (mod.id === 'itemculler' || mod.id === 'lcull' || mod.id === 'jem-adaptive-culling') {
     addOverlap(['entity-culling'], 'Частично дублирует трассировку видимости Entity Culling — чаще достаточно одного Entity Culling', -80);
   } else if (mod.id === 'enhanced-block-entities-reloaded') {
@@ -4377,6 +4486,7 @@ export function evaluateModImpactInPack(
     addOverlap(['fast-item-frames'], 'При наличии Fast Item Frames отключите itemFrameMapCulling в config/moreculling.toml', -60);
   } else if (mod.id === 'culllessleaves-reforged') {
     addSynergy(['entity-culling', 'embeddium', 'emberbium'], 'Отсекает внутренние слои листвы в лесах, снижая перерисовку геометрии и теней на пару с Entity Culling', 80);
+    addOverlap(['more-culling-reforged', 'sodium-sightline'], 'Пересечение по куллингу листвы: при использовании CullLessLeaves отключите листву в MoreCulling / Sightline', -30);
   } else if (mod.id === 'fast-item-frames') {
     addSynergy(['enhanced-block-entities-reloaded'], 'Дополняет EBER оптимизацией настенных рамок на складах', 80);
     addOverlap(['more-culling-reforged'], 'Пересекается с куллингом рамок MoreCulling — отключите itemFrameMapCulling в MoreCulling', -50);
