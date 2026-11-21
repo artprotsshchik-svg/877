@@ -47,7 +47,6 @@ export interface AssemblyPreferences {
   recipeViewer?: RecipeViewerChoice;
   packScale?: PackScale;
   goal: OptimizationGoal;
-  hideOutdatedUseless?: boolean;
   focusModId?: string | null;
 }
 
@@ -61,7 +60,6 @@ export const INITIAL_BUILDER_PREFS: AssemblyPreferences = {
   recipeViewer: 'jei',
   packScale: 'medium',
   goal: 'balanced',
-  hideOutdatedUseless: true,
   focusModId: null,
 };
 

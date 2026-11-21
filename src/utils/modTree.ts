@@ -53,7 +53,6 @@ const ADDON_PARENT_PRIORITY: Record<string, { parents: string[]; relation: strin
   'rinlib': { parents: ['structure-dfu-cache'], relation: 'Зависимость' },
   'fzzy-config': { parents: ['particle-core', 'emi-loot', 'emiffect'], relation: 'Зависимость' },
   'kotlin-for-forge': { parents: ['particle-core', 'fzzy-config', 'observable'], relation: 'Зависимость' },
-  'searchables': { parents: ['controlling'], relation: 'Зависимость' },
   'particull': { parents: ['particle-core'], relation: 'Дубль куллинга' },
   'cupboard': { parents: ['connectivity'], relation: 'Зависимость' },
   'soundgc': { parents: ['fast-sounds', 'particle-core'], relation: 'Опц. аддон' },

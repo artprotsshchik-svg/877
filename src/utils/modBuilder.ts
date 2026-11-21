@@ -944,7 +944,6 @@ export function smartFixAssembly(selectedIds: string[], prefs?: AssemblyPreferen
     ['placebo', LIBRARY_CONSUMER_MAP['placebo']],
     ['architectury-api', LIBRARY_CONSUMER_MAP['architectury-api']],
     ['rinlib', LIBRARY_CONSUMER_MAP['rinlib']],
-    ['searchables', LIBRARY_CONSUMER_MAP['searchables']],
     ['accelerated-recoiling', ['accelerated-rendering', 'accelerated-rendering-turned']],
   ];
   for (const [libId, consumers] of strictSinglePurposeLibs) {

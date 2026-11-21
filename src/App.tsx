@@ -526,9 +526,6 @@ export default function App() {
             builderSet={builderSet}
             onToggleBuilderMod={toggleBuilderMod}
             builderPrefs={builderPrefs}
-            onToggleHideOutdatedUseless={() =>
-              setBuilderPrefs(p => ({ ...p, hideOutdatedUseless: p.hideOutdatedUseless === false }))
-            }
             onOpenDetail={setSelectedModDetail}
           />
         )}

@@ -1,12 +1,12 @@
 {
   "schemaVersion": 2,
   "updatedAt": "16.11.2026",
-  "sha256": "5c8587ee4066dfb71cbb0d3c362f870a4816bfec59828608fe1123005cc3255f",
-  "bytes": 497088,
+  "sha256": "530a28a7a11c123ff373176c8de47b5acea0ab5495fc47f09dab4cfa77a53db5",
+  "bytes": 499560,
   "counts": {
-    "mods": 517,
+    "mods": 514,
     "groups": 21,
-    "presets": 2,
+    "presets": 5,
     "rules": 46,
     "golden": 27
   },

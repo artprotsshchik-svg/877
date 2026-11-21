@@ -24,7 +24,6 @@ import {
   getDirectDependencies,
   getModSuperseder,
   getRuleConflictingIds,
-  isOutdatedOrUselessMod,
   removeModsCascade,
   shouldHideMod,
   smartFixAssembly,
@@ -59,8 +58,6 @@ import {
   Copy,
   Download,
   ExternalLink,
-  Eye,
-  EyeOff,
   Info,
   Plus,
   RotateCcw,
@@ -246,10 +243,8 @@ export function AssemblyBuilderTab({
     }
   }, [visibleTabs, activeCategory]);
 
-  const hideOutdatedUseless = prefs.hideOutdatedUseless !== false;
-
   // Collect deterministic mod list for active category (or all categories when searching)
-  const { pinnedSelectedMods, availableUnselectedMods, hiddenOutdatedCount } = useMemo(() => {
+  const { pinnedSelectedMods, availableUnselectedMods } = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const isSearching = q.length > 0;
     const currentTab = CATEGORY_TABS.find(c => c.key === activeCategory);
@@ -257,7 +252,6 @@ export function AssemblyBuilderTab({
 
     const seen = new Set<string>();
     const ordered: ModItem[] = [];
-    let hiddenCount = 0;
 
     for (const group of MOD_GROUPS) {
       if (allowedGroupSet && !allowedGroupSet.has(group.id)) continue;
@@ -289,10 +283,6 @@ export function AssemblyBuilderTab({
           if (!matches) continue;
           // Keep already-selected mods visible even if unavailable in active port; hide unavailable unselected mods
           if (!isSelected && !isModAvailableInPort(m, portMode)) continue;
-          if (!isSelected && hideOutdatedUseless && isOutdatedOrUselessMod(m, selectedSet, prefs)) {
-            hiddenCount++;
-            continue;
-          }
           ordered.push(m);
           continue;
         }
@@ -305,8 +295,7 @@ export function AssemblyBuilderTab({
 
         if (!isModAvailableInPort(m, portMode)) continue;
 
-        if (shouldHideMod(m, selectedSet, prefs, { hideIncompatible: false, hideUselessCovered: hideOutdatedUseless })) {
-          if (hideOutdatedUseless) hiddenCount++;
+        if (shouldHideMod(m, selectedSet, prefs, { hideIncompatible: false, hideUselessCovered: true })) {
           continue;
         }
 
@@ -329,9 +318,8 @@ export function AssemblyBuilderTab({
     return {
       pinnedSelectedMods: selectedList,
       availableUnselectedMods: unselectedList,
-      hiddenOutdatedCount: hiddenCount,
     };
-  }, [activeCategory, searchQuery, selectedSet, portMode, prefs, hideOutdatedUseless]);
+  }, [activeCategory, searchQuery, selectedSet, portMode, prefs]);
 
   const totalVisibleModsCount = pinnedSelectedMods.length + availableUnselectedMods.length;
   const currentRecipeViewer = prefs.recipeViewer ?? 'none';
@@ -961,31 +949,6 @@ export function AssemblyBuilderTab({
             Create
           </button>
 
-          <button
-            type="button"
-            aria-pressed={hideOutdatedUseless}
-            data-hide-outdated-toggle="true"
-            onClick={() => setPrefs(p => ({ ...p, hideOutdatedUseless: p.hideOutdatedUseless === false }))}
-            title="Скрывать устаревшие (outdated), плацебо/бесполезные (danger), встроенные и перекрытые лучшим аналогом моды"
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] border text-xs font-medium transition-colors duration-150 whitespace-nowrap ${
-              hideOutdatedUseless
-                ? 'bg-[#22262b] border-[#3ddc84] text-[#e6e8ea]'
-                : 'bg-[#121417] border-[#2a2e33] text-[#8b9199] hover:text-[#e6e8ea]'
-            }`}
-          >
-            {hideOutdatedUseless ? (
-              <EyeOff className="w-3.5 h-3.5 text-[#3ddc84]" aria-hidden="true" />
-            ) : (
-              <Eye className="w-3.5 h-3.5" aria-hidden="true" />
-            )}
-            <span>Скрыть устар./бесполезные</span>
-            {hideOutdatedUseless && hiddenOutdatedCount > 0 && (
-              <span className="font-mono text-[11px] text-[#8b9199] tabular-nums">
-                ({hiddenOutdatedCount})
-              </span>
-            )}
-          </button>
-
           {focusMod && (
             <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-[4px] bg-[#121417] border border-[#3ddc84]/50 text-[11px] text-[#e6e8ea]">
               <span className="text-[#8b9199]">Упор:</span>
@@ -1196,34 +1159,20 @@ export function AssemblyBuilderTab({
         <div className="bg-[#1a1d21] border border-[#2a2e33] rounded-[6px] p-8 text-center space-y-2.5">
           <p className="text-sm font-medium text-[#e6e8ea]">Моды не найдены</p>
           <p className="text-xs text-[#8b9199] max-w-md mx-auto">
-            {hiddenOutdatedCount > 0 && hideOutdatedUseless
-              ? `Скрыто устаревших и бесполезных модов: ${hiddenOutdatedCount}. Отключите фильтр, чтобы увидеть их.`
-              : isSearching
-                ? 'Попробуйте изменить поисковый запрос или переключить режим порта.'
-                : 'В этой категории нет модов, доступных для выбранного порта.'}
+            {isSearching
+              ? 'Попробуйте изменить поисковый запрос или переключить режим порта.'
+              : 'В этой категории нет модов, доступных для выбранного порта.'}
           </p>
-          {(isSearching || (hiddenOutdatedCount > 0 && hideOutdatedUseless)) && (
-            <div className="pt-1 flex flex-wrap items-center justify-center gap-2">
-              {hiddenOutdatedCount > 0 && hideOutdatedUseless && (
-                <button
-                  type="button"
-                  onClick={() => setPrefs(p => ({ ...p, hideOutdatedUseless: false }))}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] bg-[#121417] hover:bg-[#22262b] border border-[#2a2e33] text-[#e6e8ea] text-xs font-medium transition-colors duration-150"
-                >
-                  <Eye className="w-3.5 h-3.5" aria-hidden="true" />
-                  Показать скрытые ({hiddenOutdatedCount})
-                </button>
-              )}
-              {isSearching && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] bg-[#3ddc84] hover:bg-[#34c776] text-[#0f1411] text-xs font-semibold transition-colors duration-150"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
-                  Очистить поиск
-                </button>
-              )}
+          {isSearching && (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] bg-[#3ddc84] hover:bg-[#34c776] text-[#0f1411] text-xs font-semibold transition-colors duration-150"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Очистить поиск
+              </button>
             </div>
           )}
         </div>

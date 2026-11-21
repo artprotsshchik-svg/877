@@ -45,12 +45,15 @@ test('all mods have valid CurseForge URLs, non-empty fields, and 100% MOD_GROUPS
   }
 });
 
-test('both curated presets (Nvidium reference + Alloyium counterpart) have zero conflicts, zero warnings, 7/7 subsystem coverage, and zero red mods', async () => {
+test('all 5 recreated presets have zero conflicts, zero warnings, 7/7 subsystem coverage, and zero red mods', async () => {
   const { summarizeAssemblyImpact } = await import('./modAnalyzer.ts');
-  assert.equal(MOD_PRESETS.length, 2, `Expected 2 curated presets, got ${MOD_PRESETS.length}`);
+  assert.equal(MOD_PRESETS.length, 5, `Expected 5 curated presets, got ${MOD_PRESETS.length}`);
   const expectedIds = [
     'user-nvidium-emberbium',
     'user-alloyium-embeddium',
+    'preset-shaders-oculus',
+    'preset-server-multiplayer',
+    'preset-potato-low-end',
   ];
   for (const id of expectedIds) {
     assert.ok(MOD_PRESETS.some(p => p.id === id), `Missing expected preset "${id}"`);
@@ -846,7 +849,7 @@ test('DATABASE_UPDATED_AT, per-mod update labels, organizeAssemblyTree, and form
   const byParentId = new Map(nvidiumTree.map(n => [n.parent.id, n.children.map(c => c.mod.id)]));
 
   const emberKids = byParentId.get('emberbium') ?? [];
-  for (const expected of ['nvidium', 'flerovium', 'immediatelyfast', 'kerria']) {
+  for (const expected of ['nvidium', 'flerovium', 'immediatelyfast', 'kerria', 'sodium-chloride']) {
     assert.ok(emberKids.includes(expected), `Expected ${expected} nested under emberbium`);
   }
 
@@ -861,24 +864,19 @@ test('DATABASE_UPDATED_AT, per-mod update labels, organizeAssemblyTree, and form
   assert.ok(particleKids.includes('fzzy-config'));
   assert.ok(particleKids.includes('kotlin-for-forge'));
 
-  const controllingKids = byParentId.get('controlling') ?? [];
-  assert.ok(controllingKids.includes('searchables'));
+  const soundKids = byParentId.get('fast-sounds') ?? [];
+  assert.ok(soundKids.includes('soundgc'));
 
-  // Verify shader and server tree nesting (Oculus -> Embeddium, so top root is embeddium)
-  const shaderTree = new Map(
-    organizeAssemblyTree(['embeddium', 'oculus', 'shadowlod', 'faster-iris-shadow-mapper']).map(n => [
-      n.parent.id,
-      n.children.map(c => c.mod.id),
-    ])
-  );
+  // Verify shader and server preset nesting (Oculus -> Embeddium, so top root is embeddium)
+  const shaderPreset = MOD_PRESETS.find(p => p.id === 'preset-shaders-oculus')!;
+  const shaderTree = new Map(organizeAssemblyTree(shaderPreset.modIds).map(n => [n.parent.id, n.children.map(c => c.mod.id)]));
   const embedShaderKids = shaderTree.get('embeddium') ?? [];
   assert.ok(embedShaderKids.includes('oculus'), 'Expected oculus nested under embeddium');
   assert.ok(embedShaderKids.includes('shadowlod'), 'Expected shadowlod nested under embeddium root');
   assert.ok(embedShaderKids.includes('faster-iris-shadow-mapper'), 'Expected faster-iris-shadow-mapper nested under embeddium root');
 
-  const serverTree = new Map(
-    organizeAssemblyTree(['connectivity', 'cupboard']).map(n => [n.parent.id, n.children.map(c => c.mod.id)])
-  );
+  const serverPreset = MOD_PRESETS.find(p => p.id === 'preset-server-multiplayer')!;
+  const serverTree = new Map(organizeAssemblyTree(serverPreset.modIds).map(n => [n.parent.id, n.children.map(c => c.mod.id)]));
   assert.ok((serverTree.get('connectivity') ?? []).includes('cupboard'), 'Expected cupboard nested under connectivity');
 
   // Formatted export renders 1-indexed parent mods, indented child arrows, update labels, and CurseForge URLs
@@ -1660,7 +1658,6 @@ test('verified Modrinth 1.20.1 conflicts and Forge dependencies behave accuratel
     ['sodium-embeddium-leaf-culling', ['embeddium']],
     ['ggtu', ['embeddium', 'oculus']],
     ['chunkyborder', ['chunky']],
-    ['controlling', ['searchables']],
     ['lazyyyyy', ['forgified-fabric-api', 'kotlin-for-forge']],
   ];
   for (const [modId, reqIds] of expectedDeps) {
@@ -1692,10 +1689,12 @@ test('optimized presets and bloat-free buildSmartAssembly achieve high scores wi
     for (const staple of ['entity-culling', 'clumps', 'let-me-despawn']) {
       assert.ok(preset.modIds.includes(staple), `Preset ${preset.id} should include ${staple}`);
     }
+    const summaryDefault = summarizeAssemblyImpact(preset.modIds);
     const summaryCtx = summarizeAssemblyImpact(preset.modIds, undefined, {
       ...INITIAL_BUILDER_PREFS,
       ...preset.recommendedPrefs,
     });
+    assert.ok(summaryDefault.assemblyScore >= 94, `Preset ${preset.id} expected default score >= 94, got ${summaryDefault.assemblyScore}`);
     assert.ok(summaryCtx.assemblyScore >= 96, `Preset ${preset.id} expected ctx score >= 96, got ${summaryCtx.assemblyScore}`);
     assert.equal(summaryCtx.overlaps.length, 0, `Preset ${preset.id} has overlaps`);
     assert.equal(summaryCtx.zeroOrLowImpactIds.length, 0, `Preset ${preset.id} has zero-impact mods`);
@@ -1841,7 +1840,6 @@ test('Nvidium config has valid JSON without placeholder text and group exclusive
     recipeViewer: 'emi-jei',
     packScale: 'heavy',
     allowSinytra: false,
-    hideOutdatedUseless: false,
     focusModId: 'embeddium',
   };
   const hash = encodeShareHash({
@@ -2410,10 +2408,7 @@ test('extended co-work checks cover DimThread+C2ME, ZSTDNET+KryptonHybrid, explo
     const an = analyzeSelection(preset.modIds);
     assert.equal(an.conflicts.length, 0, `Preset ${preset.id} must have 0 conflicts`);
     assert.equal(an.warnings.length, 0, `Preset ${preset.id} must have 0 warnings`);
-    const summary = summarizeAssemblyImpact(preset.modIds, an, {
-      ...INITIAL_BUILDER_PREFS,
-      ...preset.recommendedPrefs,
-    });
+    const summary = summarizeAssemblyImpact(preset.modIds, an);
     assert.equal(summary.overlaps.length, 0, `Preset ${preset.id} must have 0 overlaps`);
     assert.equal(summary.zeroOrLowImpactIds.length, 0, `Preset ${preset.id} must have 0 dead mods`);
   }
@@ -2452,83 +2447,6 @@ test('extended co-work checks cover DimThread+C2ME, ZSTDNET+KryptonHybrid, explo
     );
   }
 });
-
-test('isOutdatedOrUselessMod, shouldHideMod toggle, and persistent hideOutdatedUseless preference work accurately', async () => {
-  const { isOutdatedOrUselessMod } = await import('./modAnalyzer.ts');
-  const { decodeShareHash, encodeShareHash, parsePersistedState } = await import('./persistence.ts');
-  const byId = new Map(MODS_DATABASE.map(m => [m.id, m]));
-  const emptySet = new Set<string>();
-
-  // Default preference hides danger, outdated, redundant, coveredBy, and superseded mods
-  assert.equal(INITIAL_BUILDER_PREFS.hideOutdatedUseless, true);
-  for (const outdatedOrUselessId of [
-    'memguard',
-    'rubidium',
-    'radium-reforged',
-    'stablecap-pacer-forge-1-19-2',
-    'cullify',
-    'fastboot',
-  ]) {
-    const mod = byId.get(outdatedOrUselessId);
-    assert.ok(mod, `Expected mod ${outdatedOrUselessId} in DB`);
-    assert.equal(
-      isOutdatedOrUselessMod(mod, emptySet, INITIAL_BUILDER_PREFS),
-      true,
-      `Expected ${outdatedOrUselessId} to be classified as outdated/useless`
-    );
-    assert.equal(
-      shouldHideMod(mod, emptySet, INITIAL_BUILDER_PREFS, {
-        hideIncompatible: false,
-        hideUselessCovered: true,
-      }),
-      true
-    );
-    assert.equal(
-      shouldHideMod(mod, emptySet, INITIAL_BUILDER_PREFS, {
-        hideIncompatible: false,
-        hideUselessCovered: false,
-      }),
-      false
-    );
-    // Selected mods remain visible even when hideUselessCovered is true
-    assert.equal(
-      shouldHideMod(mod, new Set([outdatedOrUselessId]), INITIAL_BUILDER_PREFS, {
-        hideIncompatible: false,
-        hideUselessCovered: true,
-      }),
-      false
-    );
-  }
-
-  // Neither canonical preset contains any outdated/useless mods
-  for (const preset of MOD_PRESETS) {
-    const pSet = new Set(preset.modIds);
-    for (const id of preset.modIds) {
-      const mod = byId.get(id)!;
-      assert.equal(
-        isOutdatedOrUselessMod(mod, pSet, { ...INITIAL_BUILDER_PREFS, ...preset.recommendedPrefs }),
-        false,
-        `Preset ${preset.id} mod ${id} should not be outdated/useless`
-      );
-    }
-  }
-
-  // Persistence & share hash round-trip for hideOutdatedUseless
-  const parsedFalse = parsePersistedState({
-    builderPrefs: { ...INITIAL_BUILDER_PREFS, hideOutdatedUseless: false },
-  });
-  assert.equal(parsedFalse?.builderPrefs?.hideOutdatedUseless, false);
-
-  const hash = encodeShareHash({
-    activeTab: 'catalog',
-    builderModIds: ['embeddium'],
-    checkedModIds: ['embeddium'],
-    builderPrefs: { ...INITIAL_BUILDER_PREFS, hideOutdatedUseless: false },
-  });
-  const decoded = decodeShareHash(hash);
-  assert.equal(decoded?.builderPrefs?.hideOutdatedUseless, false);
-});
-
 
 
 

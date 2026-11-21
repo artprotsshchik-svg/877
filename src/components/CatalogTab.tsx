@@ -16,8 +16,9 @@ import {
   getBaseHealthTier,
   getModEffectivenessScore,
   getModRestrictionBadge,
+  getModSuperseder,
   isModIncompatibleWithSelection,
-  isOutdatedOrUselessMod,
+  isUnsupportedOnForge,
   type AssemblyPreferences,
   type CheckerTier,
 } from '../utils/modLogic.ts';
@@ -44,7 +45,6 @@ interface CatalogTabProps {
   builderSet: Set<string>;
   onToggleBuilderMod: (id: string) => void;
   builderPrefs: AssemblyPreferences;
-  onToggleHideOutdatedUseless?: () => void;
   onOpenDetail: (mod: ModItem) => void;
 }
 
@@ -71,27 +71,14 @@ export function CatalogTab({
   builderSet,
   onToggleBuilderMod,
   builderPrefs,
-  onToggleHideOutdatedUseless,
   onOpenDetail,
 }: CatalogTabProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Все');
   const [healthFilter, setHealthFilter] = useState<HealthFilter>('all');
   const [onlyLeaders, setOnlyLeaders] = useState(true);
-  const [localHideUselessCovered, setLocalHideUselessCovered] = useState(true);
+  const [hideUselessCovered, setHideUselessCovered] = useState(true);
   const [onlyCompatibleInCatalog, setOnlyCompatibleInCatalog] = useState(false);
-
-  const hideOutdatedUseless = onToggleHideOutdatedUseless
-    ? builderPrefs.hideOutdatedUseless !== false
-    : localHideUselessCovered;
-
-  const toggleHideOutdatedUseless = () => {
-    if (onToggleHideOutdatedUseless) {
-      onToggleHideOutdatedUseless();
-    } else {
-      setLocalHideUselessCovered(v => !v);
-    }
-  };
   const [expandedDescIds, setExpandedDescIds] = useState<Record<string, boolean>>({});
   const [copiedConfigId, setCopiedConfigId] = useState<string | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -109,9 +96,8 @@ export function CatalogTab({
     return ['Все', ...Object.keys(counts)];
   }, []);
 
-  const { filteredMods, hiddenOutdatedCount } = useMemo(() => {
+  const filteredMods = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    let hiddenByOutdated = 0;
 
     const list = MODS_DATABASE.filter(mod => {
       if (selectedCategory !== 'Все' && mod.category !== selectedCategory) return false;
@@ -123,7 +109,20 @@ export function CatalogTab({
         return false;
       }
 
-      if (q) {
+      if (!q) {
+        if (
+          hideUselessCovered &&
+          (mod.coveredBy ||
+            mod.status === 'danger' ||
+            isUnsupportedOnForge(mod) ||
+            getModSuperseder(mod, builderSet, builderPrefs, true) !== null)
+        ) {
+          return false;
+        }
+        if (onlyLeaders && mod.groupId && !mod.isGroupLeader) {
+          return false;
+        }
+      } else {
         const matches =
           mod.name.toLowerCase().includes(q) ||
           mod.description.toLowerCase().includes(q) ||
@@ -133,34 +132,25 @@ export function CatalogTab({
           mod.platform.toLowerCase().includes(q) ||
           (mod.tags && mod.tags.some(t => t.toLowerCase().includes(q)));
         if (!matches) return false;
-      } else if (onlyLeaders && mod.groupId && !mod.isGroupLeader) {
-        return false;
-      }
-
-      if (hideOutdatedUseless && isOutdatedOrUselessMod(mod, builderSet, builderPrefs)) {
-        hiddenByOutdated++;
-        return false;
       }
 
       return true;
     });
 
-    const sorted = [...list].sort((a, b) => {
+    return [...list].sort((a, b) => {
       const lA = a.isGroupLeader ? 1 : 0;
       const lB = b.isGroupLeader ? 1 : 0;
       if (lB !== lA) return lB - lA;
       return getModEffectivenessScore(b) - getModEffectivenessScore(a);
     });
-
-    return { filteredMods: sorted, hiddenOutdatedCount: hiddenByOutdated };
-  }, [searchQuery, selectedCategory, healthFilter, onlyLeaders, hideOutdatedUseless, onlyCompatibleInCatalog, builderSet, builderPrefs]);
+  }, [searchQuery, selectedCategory, healthFilter, onlyLeaders, hideUselessCovered, onlyCompatibleInCatalog, builderSet, builderPrefs]);
 
   useEffect(() => {
     if (scrollerRef.current) {
       scrollerRef.current.scrollTop = 0;
     }
     setScrollTop(0);
-  }, [searchQuery, selectedCategory, healthFilter, onlyLeaders, hideOutdatedUseless, onlyCompatibleInCatalog]);
+  }, [searchQuery, selectedCategory, healthFilter, onlyLeaders, hideUselessCovered, onlyCompatibleInCatalog]);
 
   useEffect(() => {
     const el = scrollerRef.current;
@@ -233,9 +223,7 @@ export function CatalogTab({
     setSelectedCategory('Все');
     setHealthFilter('all');
     setOnlyLeaders(false);
-    if (hideOutdatedUseless) {
-      toggleHideOutdatedUseless();
-    }
+    setHideUselessCovered(false);
     setOnlyCompatibleInCatalog(false);
   };
 
@@ -305,23 +293,16 @@ export function CatalogTab({
 
             <button
               type="button"
-              aria-pressed={hideOutdatedUseless}
-              data-hide-outdated-toggle="true"
-              onClick={toggleHideOutdatedUseless}
+              onClick={() => setHideUselessCovered(v => !v)}
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-xs font-medium border transition-colors duration-150 whitespace-nowrap ${
-                hideOutdatedUseless
+                hideUselessCovered
                   ? 'bg-[#22262b] border-[#3ddc84] text-[#e6e8ea]'
                   : 'bg-[#121417] border-[#2a2e33] text-[#8b9199] hover:text-[#e6e8ea] hover:bg-[#22262b]'
               }`}
-              title="Скрывать устаревшие (outdated), бесполезные/плацебо (danger), встроенные и перекрытые моды"
+              title="Скрывать плацебо, нерабочие на Forge, встроенные и перекрытые моды"
             >
-              {hideOutdatedUseless ? <EyeOff className="w-3.5 h-3.5 text-[#3ddc84]" aria-hidden="true" /> : <Eye className="w-3.5 h-3.5" aria-hidden="true" />}
-              Скрыть устар./бесполезные
-              {hideOutdatedUseless && hiddenOutdatedCount > 0 && (
-                <span className="font-mono text-[11px] text-[#8b9199] tabular-nums">
-                  ({hiddenOutdatedCount})
-                </span>
-              )}
+              {hideUselessCovered ? <EyeOff className="w-3.5 h-3.5 text-[#3ddc84]" aria-hidden="true" /> : <Eye className="w-3.5 h-3.5" aria-hidden="true" />}
+              Скрыть лишние
             </button>
 
             <button
@@ -352,26 +333,14 @@ export function CatalogTab({
           <p className="text-xs text-[#8b9199]">
             Попробуйте ослабить статус, выключить фильтр лидеров или очистить поисковую строку.
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            {hideOutdatedUseless && hiddenOutdatedCount > 0 && (
-              <button
-                type="button"
-                onClick={toggleHideOutdatedUseless}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] bg-[#22262b] hover:bg-[#2a2e33] border border-[#3a3f46] text-[#e6e8ea] text-xs font-medium transition-colors duration-150 whitespace-nowrap"
-              >
-                <Eye className="w-3.5 h-3.5" aria-hidden="true" />
-                Показать скрытые ({hiddenOutdatedCount})
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={resetCatalogFilters}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] bg-[#3ddc84] hover:bg-[#34c776] text-[#0f1411] text-xs font-semibold transition-colors duration-150 whitespace-nowrap"
-            >
-              <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
-              Сбросить фильтры
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={resetCatalogFilters}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] bg-[#3ddc84] hover:bg-[#34c776] text-[#0f1411] text-xs font-semibold transition-colors duration-150 whitespace-nowrap"
+          >
+            <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+            Сбросить фильтры
+          </button>
         </div>
       ) : (
         <div

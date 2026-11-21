@@ -61,10 +61,6 @@ export function sanitizeBuilderPrefs(raw: unknown): AssemblyPreferences | null {
     portStrategy,
     recipeViewer,
     packScale,
-    hideOutdatedUseless:
-      typeof r.hideOutdatedUseless === 'boolean'
-        ? r.hideOutdatedUseless
-        : INITIAL_BUILDER_PREFS.hideOutdatedUseless,
     focusModId,
   };
 }
@@ -139,7 +135,6 @@ export function encodeShareHash(state: {
       rv: state.builderPrefs.recipeViewer,
       sc: state.builderPrefs.packScale,
       al: state.builderPrefs.allowSinytra,
-      hu: state.builderPrefs.hideOutdatedUseless !== false,
       fc: state.builderPrefs.focusModId ?? null,
     },
   };
@@ -170,8 +165,6 @@ export function decodeShareHash(hash: string): Partial<PersistedAppState> | null
         recipeViewer: p.rv,
         packScale: p.sc,
         allowSinytra: typeof p.al === 'boolean' ? p.al : INITIAL_BUILDER_PREFS.allowSinytra,
-        hideOutdatedUseless:
-          typeof p.hu === 'boolean' ? p.hu : INITIAL_BUILDER_PREFS.hideOutdatedUseless,
         focusModId: p.fc ?? null,
       },
     });
