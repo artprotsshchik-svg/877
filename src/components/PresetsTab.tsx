@@ -100,10 +100,17 @@ export function PresetsTab({
     [selectedPresetId]
   );
 
-  const counterpartPreset = useMemo(
-    () => MOD_PRESETS.find(p => p.id !== activePreset?.id) ?? null,
-    [activePreset]
-  );
+  const counterpartPreset = useMemo(() => {
+    if (!activePreset) return null;
+    if (activePreset.id === 'user-alloyium-embeddium') {
+      return MOD_PRESETS.find(p => p.id === 'user-nvidium-emberbium') ?? null;
+    }
+    return (
+      MOD_PRESETS.find(p => p.id === 'user-alloyium-embeddium' && p.id !== activePreset.id) ??
+      MOD_PRESETS.find(p => p.id !== activePreset.id) ??
+      null
+    );
+  }, [activePreset]);
 
   const diffFromCounterpart = useMemo(() => {
     if (!activePreset || !counterpartPreset) return null;
@@ -176,7 +183,7 @@ export function PresetsTab({
   const handleCopyNamesList = (preset: ModPreset) => {
     const rows = buildPresetModRows(preset);
     const orderedNames = rows.map(r => r.mod.name);
-    if (preset.id === 'user-nvidium-emberbium') {
+    if (preset.modIds.includes('sinytra-connector') && preset.modIds.includes('nvidium')) {
       orderedNames.unshift('.connector (авто-кэш Sinytra Connector для Nvidium)');
     }
     navigator.clipboard?.writeText?.(orderedNames.join('\n'))?.catch(() => {});
@@ -300,8 +307,8 @@ export function PresetsTab({
         );
       })()}
 
-      {/* Two Curated Preset Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Curated Preset Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {evaluatedPresets.map(
           ({
             preset,
@@ -311,8 +318,16 @@ export function PresetsTab({
             yellowCount: presetYellowCount,
           }) => {
             const isSelected = preset.id === activePreset.id;
-            const otherPreset = evaluatedPresets.find(e => e.preset.id !== preset.id)?.preset ?? null;
-            const cardDiff = otherPreset ? getPresetDiffSummary(preset, otherPreset) : null;
+            const referencePreset =
+              preset.id === 'user-alloyium-embeddium'
+                ? MOD_PRESETS.find(p => p.id === 'user-nvidium-emberbium') ?? null
+                : MOD_PRESETS.find(p => p.id === 'user-alloyium-embeddium') ??
+                  evaluatedPresets.find(e => e.preset.id !== preset.id)?.preset ??
+                  null;
+            const cardDiff =
+              referencePreset && referencePreset.id !== preset.id
+                ? getPresetDiffSummary(preset, referencePreset)
+                : null;
             const badgeTone = getBadgeTone(preset.badgeColor);
 
             return (
@@ -392,9 +407,11 @@ export function PresetsTab({
                     <div className="text-[#8b9199]">
                       <strong className="text-[#e6e8ea]">Риск:</strong> {preset.crashRisk}
                     </div>
-                    {cardDiff && (
+                    {cardDiff && referencePreset && (
                       <div className="text-[#8b9199] pt-1 border-t border-[#2a2e33]/70">
-                        <strong className="text-[#e6e8ea]">Отличие от второй сборки:</strong>{' '}
+                        <strong className="text-[#e6e8ea]">
+                          Отличие от «{referencePreset.name.split('(')[0].split(':')[0].trim()}»:
+                        </strong>{' '}
                         <span className="text-[#e6e8ea]">
                           {cardDiff.onlyInReference.map(m => m.name).join(', ')}
                         </span>{' '}
@@ -452,7 +469,7 @@ export function PresetsTab({
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="text-[#8b9199]">Разбор сборки:</span>
             <span className="font-semibold text-[#e6e8ea]">{activePreset.name}</span>
-            {activePreset.id === 'user-nvidium-emberbium' && (
+            {activePreset.modIds.includes('sinytra-connector') && activePreset.modIds.includes('nvidium') && (
               <span className="px-2 py-0.5 rounded-[4px] bg-[#121417] border border-[#2a2e33] text-[11px] font-mono text-[#5cb3ff]">
                 + .connector (кэш Sinytra)
               </span>

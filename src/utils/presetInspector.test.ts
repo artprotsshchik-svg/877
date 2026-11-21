@@ -8,30 +8,31 @@ import {
   getPresetDiffSummary,
 } from './presetInspector.ts';
 
-test('presetInspector builds complete rows with per-mod purpose and contextual interactions for both presets', () => {
-  assert.equal(MOD_PRESETS.length, 2);
+test('presetInspector builds complete rows with per-mod purpose and contextual interactions for all 6 presets', () => {
+  assert.equal(MOD_PRESETS.length, 6);
 
-  const nvidiumPreset = MOD_PRESETS.find(p => p.id === 'user-nvidium-emberbium');
-  const alloyiumPreset = MOD_PRESETS.find(p => p.id === 'user-alloyium-embeddium');
-  assert.ok(nvidiumPreset && alloyiumPreset);
+  const expectedCounts: Record<string, number> = {
+    'user-nvidium-emberbium': 47,
+    'user-alloyium-embeddium': 44,
+    'shaders-optimum': 48,
+    'create-industry-shaders': 57,
+    'multiplayer-heavy-server': 55,
+    'potato-integrated-gpu': 37,
+  };
 
-  const nvidiumRows = buildPresetModRows(nvidiumPreset);
-  const alloyiumRows = buildPresetModRows(alloyiumPreset);
+  for (const [presetId, expectedCount] of Object.entries(expectedCounts)) {
+    const preset = MOD_PRESETS.find(p => p.id === presetId);
+    assert.ok(preset, `Missing preset ${presetId}`);
+    const rows = buildPresetModRows(preset);
+    assert.equal(rows.length, expectedCount, `${presetId} expected ${expectedCount} rows, got ${rows.length}`);
 
-  assert.equal(nvidiumRows.length, 48);
-  assert.equal(alloyiumRows.length, 45);
-
-  for (const [presetName, rows] of [
-    [nvidiumPreset.id, nvidiumRows],
-    [alloyiumPreset.id, alloyiumRows],
-  ] as const) {
     rows.forEach((row, idx) => {
-      assert.equal(row.index, idx + 1, `${presetName}: index sequence broken at ${row.mod.id}`);
-      assert.ok(row.mod.description.trim().length > 10, `${presetName}: empty description for ${row.mod.id}`);
-      assert.ok(row.impact.summary.trim().length > 10, `${presetName}: empty impact summary for ${row.mod.id}`);
+      assert.equal(row.index, idx + 1, `${presetId}: index sequence broken at ${row.mod.id}`);
+      assert.ok(row.mod.description.trim().length > 10, `${presetId}: empty description for ${row.mod.id}`);
+      assert.ok(row.impact.summary.trim().length > 10, `${presetId}: empty impact summary for ${row.mod.id}`);
       assert.ok(
         row.impact.interactions.length > 0,
-        `${presetName}: expected contextual interactions for ${row.mod.id}`
+        `${presetId}: expected contextual interactions for ${row.mod.id}`
       );
       for (const note of row.impact.interactions) {
         const meta = getInteractionKindMeta(note.kind);
@@ -40,7 +41,10 @@ test('presetInspector builds complete rows with per-mod purpose and contextual i
     });
   }
 
-  // Controlling must be attached with Searchables inside both assemblies
+  const nvidiumRows = buildPresetModRows(MOD_PRESETS.find(p => p.id === 'user-nvidium-emberbium')!);
+  const alloyiumRows = buildPresetModRows(MOD_PRESETS.find(p => p.id === 'user-alloyium-embeddium')!);
+
+  // Controlling must be attached with Searchables inside both flagship assemblies
   const controllingRow = nvidiumRows.find(r => r.mod.id === 'controlling');
   assert.ok(controllingRow);
   assert.ok(controllingRow.impact.interactions.some(i => i.targetIds.includes('searchables')));
@@ -75,7 +79,7 @@ test('presetInspector filters by query, category, reaction filter, and computes 
   assert.ok(supportOnly.some(r => r.mod.id === 'controlling'));
 
   const diff = getPresetDiffSummary(nvidiumPreset, alloyiumPreset);
-  assert.equal(diff.sharedCount, 43);
+  assert.equal(diff.sharedCount, 42);
   assert.deepEqual(
     diff.onlyInReference.map(m => m.id).sort(),
     ['connector-extras', 'emberbium', 'forgified-fabric-api', 'nvidium', 'sinytra-connector']

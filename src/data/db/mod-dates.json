@@ -72,5 +72,7 @@
   "fast-item-frames": "1.20.1 LTS",
   "vanillin": "1.20.1 Forge",
   "falling-blocks-fps-fix": "1.20.1 Forge",
-  "structure-dfu-cache": "1.20.1 Forge"
+  "structure-dfu-cache": "1.20.1 Forge",
+  "toast-control": "1.20.1 LTS",
+  "iris-oculus-flywheel-compat": "1.20.1 Forge"
 }

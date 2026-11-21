@@ -48,7 +48,9 @@ export function isUnsupportedOnForge(mod: ModItem): boolean {
     mod.platform.includes('Несовм.') ||
     mod.platform.includes('Fabric (Справка') ||
     mod.platform.includes('1.20.4 / 1.21+') ||
-    mod.platform.includes('NeoForge 1.21+')
+    mod.platform.includes('NeoForge 1.21+') ||
+    mod.platform.includes('NeoForge 1.20.4+') ||
+    (mod.platform.includes('NeoForge') && !/\bForge\b/.test(mod.platform))
   );
 }
 
@@ -138,6 +140,15 @@ export const EXCLUSIVE_ENGINE_POOLS: Record<string, string[]> = {
   'f3-debug-screen': ['compact-f3-plus', 'improved-f3'],
   'splash-screen-hooks': ['smooth-loading-screens', 'early-loading-screen', 'splashscreen'],
   'entity-tick-sleep': ['entitysleep', 'enttick', 'sleepium', 'martensite-entity-tick-skiper'],
+  'boot-spawn-loader': ['fastload', 'ksyxis'],
+  'thread-schedulers': [
+    'threadtweak-reforged',
+    'smooth-boot-reloaded',
+    'threads',
+    'thread-priorities',
+    'thread-tweaks',
+    'worker-threads',
+  ],
 };
 
 export const MOD_HARD_DEPENDENCIES: Record<string, string[]> = {
@@ -192,6 +203,8 @@ export const MOD_HARD_DEPENDENCIES: Record<string, string[]> = {
   'just-enough-threads': ['just-enough-items-jei'],
   'jeir-jei-rewired': ['just-enough-items-jei'],
   'controlling': ['searchables'],
+  'toast-control': ['placebo'],
+  'iris-oculus-flywheel-compat': ['flywheel'],
 };
 
 export const MOD_ALTERNATIVE_DEPENDENCIES: Record<string, string[][]> = {
@@ -209,6 +222,7 @@ export const MOD_ALTERNATIVE_DEPENDENCIES: Record<string, string[][]> = {
   'accelerated-recoiling': [['accelerated-rendering', 'accelerated-rendering-turned']],
   'bons-dlss-diet-complementary-unbound': [['oculus', 'emberlens']],
   'shadowlod': [['oculus', 'emberlens']],
+  'iris-oculus-flywheel-compat': [['oculus', 'emberlens']],
 };
 
 const NVIDIUM_FAMILY_IDS = new Set(['nvidium']);
@@ -543,6 +557,30 @@ export function getRuleConflictingIds(modId: string): string[] {
       continue;
     }
 
+    if (rule.title.includes('SuperChunk')) {
+      for (const m of MODS_DATABASE) {
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
+        if (mod.id === 'superchunk') {
+          if (m.id !== 'superchunk' && slugSet.has(ms)) conflicts.add(m.id);
+        } else if (m.id === 'superchunk') {
+          conflicts.add(m.id);
+        }
+      }
+      continue;
+    }
+
+    if (rule.title.includes('CLab с куллингом листвы')) {
+      for (const m of MODS_DATABASE) {
+        const ms = MOD_SLUG_BY_ID.get(m.id) || '';
+        if (mod.id === 'clab') {
+          if (m.id !== 'clab' && slugSet.has(ms)) conflicts.add(m.id);
+        } else if (m.id === 'clab') {
+          conflicts.add(m.id);
+        }
+      }
+      continue;
+    }
+
     for (const m of MODS_DATABASE) {
       if (m.id !== modId && slugSet.has(MOD_SLUG_BY_ID.get(m.id) || '')) {
         conflicts.add(m.id);
@@ -701,6 +739,42 @@ export function analyzeSelection(selectedIds: string[]) {
       );
       if (others.length > 0) {
         const matched = [zstd, ...others];
+        matched.forEach(m => conflictingIdSet.add(m.id));
+        conflicts.push({
+          rule,
+          matchedIds: matched.map(m => m.id),
+          matchedNames: matched.map(m => m.name),
+        });
+      }
+      continue;
+    }
+
+    if (rule.title.includes('SuperChunk')) {
+      const superChunk = selectedMods.find(m => m.id === 'superchunk');
+      if (!superChunk) continue;
+      const others = selectedMods.filter(
+        m => m.id !== 'superchunk' && slugSet.has(MOD_SLUG_BY_ID.get(m.id) || '')
+      );
+      if (others.length > 0) {
+        const matched = [superChunk, ...others];
+        matched.forEach(m => conflictingIdSet.add(m.id));
+        conflicts.push({
+          rule,
+          matchedIds: matched.map(m => m.id),
+          matchedNames: matched.map(m => m.name),
+        });
+      }
+      continue;
+    }
+
+    if (rule.title.includes('CLab с куллингом листвы')) {
+      const clab = selectedMods.find(m => m.id === 'clab');
+      if (!clab) continue;
+      const others = selectedMods.filter(
+        m => m.id !== 'clab' && slugSet.has(MOD_SLUG_BY_ID.get(m.id) || '')
+      );
+      if (others.length > 0) {
+        const matched = [clab, ...others];
         matched.forEach(m => conflictingIdSet.add(m.id));
         conflicts.push({
           rule,
@@ -928,7 +1002,8 @@ export function analyzeSelection(selectedIds: string[]) {
   const hasAnyC2ME =
     selectedSet.has('concurrent-chunk-management-engine-forge-c2me') ||
     selectedSet.has('c2me-concurrent-chunk-management-engine') ||
-    selectedSet.has('c2mer');
+    selectedSet.has('c2mer') ||
+    selectedSet.has('hc-harichunk');
   if (hasAnyC2ME) {
     for (const oldLithiumId of ['radium-reforged', 'canary']) {
       if (selectedSet.has(oldLithiumId)) {
@@ -1038,12 +1113,12 @@ export function analyzeSelection(selectedIds: string[]) {
   }
 
   if (hasAnyC2ME) {
-    if (selectedSet.has('parallel-world-save') && selectedSet.has('c2mer')) {
+    if (selectedSet.has('parallel-world-save')) {
       warnings.push({
         modId: 'parallel-world-save',
         modName: 'Parallel World Save',
         severity: 'yellow',
-        message: 'C2MER уже переводит сохранение чанков в асинхронный режим — Parallel World Save создаёт двойной перехват записи мира.',
+        message: 'C2ME уже переводит сохранение регионов в асинхронный режим — Parallel World Save создаёт двойной перехват записи чанков на диск.',
       });
     }
     if (selectedSet.has('delta-chunk')) {
@@ -1060,6 +1135,87 @@ export function analyzeSelection(selectedIds: string[]) {
       modName: 'Delta Chunk',
       severity: 'yellow',
       message: 'Параллельная запись Parallel World Save и дельта-сохранение Delta Chunk перехватывают один и тот же цикл записи чанков — оставьте один мод.',
+    });
+  }
+
+  if (selectedSet.has('gputape') && selectedSet.has('fix-gpu-memory-leak')) {
+    warnings.push({
+      modId: 'fix-gpu-memory-leak',
+      modName: 'Fix GPU memory leak',
+      severity: 'yellow',
+      message: 'Пересечение очистки VRAM: GPUTape уже закрывает утечки OpenGL 4.5+ DSA буферов (Fix GPU memory leak нужен лишь как запасной вариант на старых GPU).',
+    });
+  }
+
+  const missingRamCore = (['modernfix', 'ferritecore'] as const).filter(id => !selectedSet.has(id));
+  if (missingRamCore.length > 0) {
+    const heavyLodChunkMods = [
+      'distant-horizons',
+      'concurrent-chunk-management-engine-forge-c2me',
+      'c2me-concurrent-chunk-management-engine',
+      'c2mer',
+      'hc-harichunk',
+      'bobby-reforged',
+      'farsight',
+    ];
+    const missingNames = missingRamCore.map(id => MOD_BY_ID.get(id)?.name || id);
+    for (const heavyId of heavyLodChunkMods) {
+      if (!selectedSet.has(heavyId)) continue;
+      const heavyMod = MOD_BY_ID.get(heavyId);
+      warnings.push({
+        modId: heavyId,
+        modName: heavyMod?.name || heavyId,
+        severity: 'yellow',
+        message: `${heavyMod?.name || heavyId} резко повышает расход ОЗУ на буферы чанков/LOD — без ${missingNames.join(' + ')} возможны OOM-фризы и жёсткий GC.`,
+        fixModIds: [...missingRamCore],
+      });
+    }
+  }
+
+  if (
+    selectedSet.has('stutterfix-reforged') &&
+    (selectedSet.has('threadtweak-reforged') || selectedSet.has('smooth-boot-reloaded'))
+  ) {
+    const peerSchedulers = ['threadtweak-reforged', 'smooth-boot-reloaded']
+      .filter(id => selectedSet.has(id))
+      .map(id => MOD_BY_ID.get(id)?.name || id);
+    warnings.push({
+      modId: 'stutterfix-reforged',
+      modName: 'StutterFix-Reforged',
+      severity: 'yellow',
+      message: `Пересечение планировщиков CPU: StutterFix-Reforged и ${peerSchedulers.join(' / ')} одновременно переназначают приоритеты потоков — оставьте один планировщик.`,
+    });
+  }
+
+  if (selectedSet.has('entity-culling')) {
+    for (const cullerPeerId of ['itemculler', 'lcull', 'jem-adaptive-culling'] as const) {
+      if (selectedSet.has(cullerPeerId)) {
+        const peerName = MOD_BY_ID.get(cullerPeerId)?.name || cullerPeerId;
+        warnings.push({
+          modId: cullerPeerId,
+          modName: peerName,
+          severity: 'yellow',
+          message: `Частичное пересечение куллинга: Entity Culling уже скрывает невидимый дроп и сущности за стенами — ${peerName} дублирует трассировку.`,
+        });
+      }
+    }
+  }
+
+  if (selectedSet.has('more-culling-reforged') && selectedSet.has('fast-item-frames')) {
+    warnings.push({
+      modId: 'more-culling-reforged',
+      modName: 'MoreCulling Reforged',
+      severity: 'yellow',
+      message: 'Пересечение с Fast Item Frames: отключите itemFrameMapCulling в config/moreculling.toml или оставьте один мод на рамки.',
+    });
+  }
+
+  if (selectedSet.has('sodium-sightline') && (selectedSet.has('oculus') || selectedSet.has('emberlens'))) {
+    warnings.push({
+      modId: 'sodium-sightline',
+      modName: 'Sodium Sightline',
+      severity: 'yellow',
+      message: 'Sodium Sightline (ранее Fovea/Streamline, усечение бокового FOV) при работе с шейдерами Oculus/Emberlens может обрезать боковые тени и отражения.',
     });
   }
 
@@ -1627,6 +1783,8 @@ const HIGH_SYNERGY_IDS = new Set([
   'emi',
   'tmrv-updated',
   'fastali',
+  'iris-oculus-flywheel-compat',
+  'toast-control',
 ]);
 
 const NETWORK_MULTIPLAYER_IDS = new Set([
@@ -2787,7 +2945,7 @@ export const LIBRARY_CONSUMER_MAP: Record<string, string[]> = {
   'resourceful-config': ['structure-layout-optimizer'],
   'puzzles-lib': ['fast-item-frames'],
   'almanac': ['let-me-despawn'],
-  'placebo': ['fastsuite', 'fastfurnace', 'fastworkbench'],
+  'placebo': ['fastsuite', 'fastfurnace', 'fastworkbench', 'toast-control'],
   'architectury-api': ['observable'],
   'rinlib': ['structure-dfu-cache'],
   'searchables': ['controlling'],
@@ -2865,9 +3023,9 @@ const SUBSYSTEM_DEFINITIONS: Array<{
     groupIds: ['tick-physics-engine'],
     weights: {
       'radium-re-reforged': 10.5,
-      'immersive-optimization': 4,
+      'immersive-optimization': 5,
       badoptimizations: 3,
-      servercore: 3.5,
+      servercore: 4.5,
       'alternate-current': 2,
       'entity-collision-optimization': 1.5,
       'villager-optimizer': 1.5,
@@ -2876,6 +3034,7 @@ const SUBSYSTEM_DEFINITIONS: Array<{
       fastspawner: 1,
       flywheel: 2,
       vanillin: 2,
+      'iris-oculus-flywheel-compat': 2,
       'geckolibbetterfps': 2.5,
       'geckolib-animation-optimizer': 1.8,
       'radium-reforged': 5,
@@ -2941,6 +3100,7 @@ const SUBSYSTEM_DEFINITIONS: Array<{
       'amd-fsr-upscaler-render-scale-for-embeddium': 1.5,
       ggtu: 1.0,
       particull: 1.2,
+      'toast-control': 0.8,
     },
   },
   {
@@ -2951,11 +3111,12 @@ const SUBSYSTEM_DEFINITIONS: Array<{
     weights: {
       clumps: 2.5,
       'let-me-despawn': 1.5,
-      'packet-fixer': 1,
+      'packet-fixer': 1.5,
       'krypton-reno': 2.5,
       'krypton-hybrid': 1.8,
       pluto: 1.2,
-      connectivity: 1.8,
+      connectivity: 2.2,
+      'fast-ip-ping': 0.8,
       'vmp-forge': 2,
       'very-many-players-vmp': 1.5,
       emi: 1.5,
@@ -3029,6 +3190,15 @@ function computeZeroEffectiveSet(
       zeroEffectiveSet.add(m.id);
     }
     if (m.id === 'fastali' && !selectedSet.has('advanced-loot-info-ali')) {
+      zeroEffectiveSet.add(m.id);
+    }
+    if (
+      m.id === 'iris-oculus-flywheel-compat' &&
+      (!selectedSet.has('flywheel') || (!selectedSet.has('oculus') && !selectedSet.has('emberlens')))
+    ) {
+      zeroEffectiveSet.add(m.id);
+    }
+    if (m.id === 'toast-control' && !selectedSet.has('placebo')) {
       zeroEffectiveSet.add(m.id);
     }
   }
@@ -3476,10 +3646,17 @@ export function evaluateDubiousMods(
             : mod.warning || mod.bestAlternative || 'Экспериментальный или требовательный к видеопамяти/миксинам мод.';
     } else if (
       mod.id === 'flywheel' &&
-      (selectedSet.has('oculus') || selectedSet.has('emberlens'))
+      (selectedSet.has('oculus') || selectedSet.has('emberlens')) &&
+      !selectedSet.has('iris-oculus-flywheel-compat')
     ) {
       severity = 'low';
       reason = 'С шейдерами Oculus/Emberlens GPU-инстансинг Flywheel 1.0 отключается без моста (Iris & Oculus Flywheel Compat / Colorwheel), снижая FPS у механизмов Create.';
+    } else if (
+      mod.id === 'sodium-sightline' &&
+      (selectedSet.has('oculus') || selectedSet.has('emberlens'))
+    ) {
+      severity = 'medium';
+      reason = 'С шейдерами Oculus/Emberlens сужение бокового обзора Sodium Sightline может вызывать пропадание боковых теней и отражений.';
     } else if (
       mod.id === 'distant-horizons' &&
       (selectedSet.has('concurrent-chunk-management-engine-forge-c2me') ||
@@ -3568,11 +3745,13 @@ const SHADER_SUPPORT_MOD_IDS = new Set([
   'shadowlod',
   'unofficial-luxium-compatibility-luxium-oculus',
   'bons-dlss-diet-complementary-unbound',
+  'iris-oculus-flywheel-compat',
 ]);
 
 const CREATE_PRIORITY_MOD_IDS = new Set([
   'flywheel',
   'vanillin',
+  'iris-oculus-flywheel-compat',
   'starlight-with-create-fix',
   'radium-re-reforged',
   'immersive-optimization',
@@ -3724,9 +3903,30 @@ function computePackScoreInternal(
   if (selectedSet.has('noisiumed') && (selectedSet.has('solix') || selectedSet.has('structure-layout-optimizer'))) bonus += 1.0;
   if (selectedSet.has('emi') && selectedSet.has('tmrv-updated')) bonus += 1.0;
   if (selectedSet.has('flywheel') && selectedSet.has('vanillin')) bonus += 1.5;
-  if (selectedSet.has('fastload') && selectedSet.has('ksyxis')) bonus += 0.8;
-  if (selectedSet.has('packet-fixer') && (selectedSet.has('connectivity') || selectedSet.has('krypton-reno'))) bonus += 0.8;
-  if (selectedSet.has('threadtweak-reforged') && selectedSet.has('stutterfix-reforged')) bonus += 0.6;
+  if (
+    selectedSet.has('iris-oculus-flywheel-compat') &&
+    selectedSet.has('flywheel') &&
+    (selectedSet.has('oculus') || selectedSet.has('emberlens'))
+  ) {
+    bonus += 0.8;
+  }
+  if (
+    selectedSet.has('packet-fixer') &&
+    (selectedSet.has('connectivity') ||
+      selectedSet.has('krypton-reno') ||
+      selectedSet.has('krypton-hybrid') ||
+      selectedSet.has('aegisnetworking-krypton-hybrid'))
+  ) {
+    bonus += 0.8;
+  }
+  if (
+    selectedSet.has('more-culling-reforged') &&
+    selectedSet.has('enhanced-block-entities-reloaded') &&
+    !selectedSet.has('fast-item-frames')
+  ) {
+    bonus += 0.7;
+  }
+  if (selectedSet.has('toast-control') && selectedSet.has('placebo')) bonus += 0.5;
   if (selectedSet.has('kerria') && (selectedSet.has('embeddium') || selectedSet.has('emberbium')) && selectedSet.has('immediatelyfast')) {
     bonus += 0.8;
   }
@@ -3747,6 +3947,16 @@ function computePackScoreInternal(
   }
   if (selectedSet.has('embeddium-extras') && selectedSet.has('sodium-chloride')) penalty += 2;
   if (selectedSet.has('more-culling-reforged') && selectedSet.has('culllessleaves-reforged')) penalty += 1;
+  if (selectedSet.has('more-culling-reforged') && selectedSet.has('fast-item-frames')) penalty += 1.5;
+  if (
+    selectedSet.has('stutterfix-reforged') &&
+    (selectedSet.has('threadtweak-reforged') || selectedSet.has('smooth-boot-reloaded'))
+  ) {
+    penalty += 1.5;
+  }
+  if (selectedSet.has('sodium-sightline') && (selectedSet.has('oculus') || selectedSet.has('emberlens'))) {
+    penalty += 2;
+  }
   if (selectedSet.has('dynamic-fps') && (selectedSet.has('restmode') || selectedSet.has('idle-boost'))) penalty += 1.5;
   if (selectedSet.has('particle-core') && selectedSet.has('particull')) penalty += 1.5;
 
@@ -4090,6 +4300,14 @@ export function evaluateModImpactInPack(
     addSynergy(['embeddium', 'emberbium', 'immediatelyfast'], 'Кэширует неинтерполированные анимации текстур на GPU (огонь, вода, порталы), убирая фризы glTexSubImage2D', 150);
   } else if (mod.id === 'gputape') {
     addSynergy(['emberbium', 'embeddium', 'nvidium', 'alloyium'], 'Очищает устаревшие GPU/OpenGL-буферы и страхует от переполнения 4 ГБ VRAM при смене миров и пролётах', 110);
+    addOverlap(['fix-gpu-memory-leak'], 'GPUTape уже чистит буферы через OpenGL 4.5+ DSA — Fix GPU memory leak в этой паре избыточен', -40);
+  } else if (mod.id === 'fix-gpu-memory-leak') {
+    addSynergy(['embeddium', 'immediatelyfast'], 'Запасной очиститель GPU-утечек для старых OpenGL < 4.5 и встроек без GPUTape', 70);
+    addOverlap(['gputape'], 'Перекрыт GPUTape: на OpenGL 4.5+ достаточно одного GPUTape', -80);
+  } else if (mod.id === 'oculus' || mod.id === 'emberlens') {
+    addSynergy(['embeddium', 'emberbium', 'faster-iris-shadow-mapper', 'shadowlod', 'iris-oculus-flywheel-compat'], 'Шейдерный конвейер поверх Sodium/Embeddium с ускорителями теней и совместимости', 100);
+  } else if (mod.id === 'faster-iris-shadow-mapper' && (withoutSet.has('oculus') || withoutSet.has('emberlens'))) {
+    addSynergy(['oculus', 'emberlens', 'shadowlod'], 'Оптимизирует выборку и отсечение теневых карт в шейдерах Oculus/Emberlens', 120);
   } else if (mod.id === 'shadowlod' && (withoutSet.has('oculus') || withoutSet.has('emberlens'))) {
     addSynergy(['oculus', 'emberlens', 'faster-iris-shadow-mapper'], 'Снижает стоимость далёких проходов теней в шейдерах без заметной потери детализации вблизи', 130);
   } else if (mod.id === 'nvidium') {
@@ -4107,6 +4325,8 @@ export function evaluateModImpactInPack(
       });
       delta += 40;
     }
+  } else if (mod.id === 'sodium-sightline' && (withoutSet.has('oculus') || withoutSet.has('emberlens'))) {
+    addOverlap(['oculus', 'emberlens'], 'При игре с шейдерами усечение бокового FOV может срезать боковые тени и отражения', -90);
   }
 
   // Embeddium Extras vs Chloride partial overlap (without failing Test 4 warnings)
@@ -4116,18 +4336,27 @@ export function evaluateModImpactInPack(
     addOverlap(['embeddium-extras'], 'Частичное пересечение с Embeddium Extras: оставьте общий зум/FPS-HUD только в одном моде', -90);
   } else if (mod.id === 'sodium-chloride' && withoutSet.has('sodium-embeddium-dynamic-lights')) {
     addOverlap(['sodium-embeddium-dynamic-lights'], 'Динамический свет дублируется отдельным модом Sodium/Embeddium Dynamic Lights', -40);
+  } else if (mod.id === 'sodium-chloride' && hasRenderCore) {
+    addSynergy(['embeddium', 'emberbium'], 'Расширяет настройки графики, зум и клиентские твики поверх Embeddium/Emberbium', 40);
   }
 
   // Culling 3-layer synergy
   if (mod.id === 'entity-culling') {
     addSynergy(['culllessleaves-reforged', 'enhanced-block-entities-reloaded', 'more-culling-reforged'], 'Трёхслойный куллинг: сущности за стенами + невидимые грани/рамки + запечённые сундуки', 140);
+    addOverlap(['itemculler', 'lcull', 'jem-adaptive-culling'], 'Частичное пересечение: Entity Culling уже скрывает невидимые предметы и сущности за стенами', -40);
+  } else if (mod.id === 'itemculler' || mod.id === 'lcull' || mod.id === 'jem-adaptive-culling') {
+    addOverlap(['entity-culling'], 'Частично дублирует трассировку видимости Entity Culling — чаще достаточно одного Entity Culling', -80);
   } else if (mod.id === 'enhanced-block-entities-reloaded') {
-    addSynergy(['matlib', 'entity-culling', 'fast-item-frames'], 'Запекает сундуки, таблички и кровати в статические чанки (через MatLib), разгружая Entity Culling и рамки', 120);
+    addSynergy(['matlib', 'entity-culling', 'fast-item-frames', 'more-culling-reforged'], 'Запекает сундуки, таблички и кровати в статические чанки (через MatLib), разгружая Entity Culling и рамки', 120);
   } else if (mod.id === 'more-culling-reforged') {
-    addSynergy(['entity-culling'], 'Дополняет Entity Culling отсечением невидимых граней блоков и рамок', 90);
+    addSynergy(['entity-culling', 'enhanced-block-entities-reloaded'], 'Дополняет Entity Culling и EBER отсечением невидимых граней блоков, табличек и рамок', 95);
     addOverlap(['culllessleaves-reforged'], 'При наличии CullLessLeaves Reforged оставьте куллинг листвы за ним (в More Culling отключите листву)', -60);
+    addOverlap(['fast-item-frames'], 'При наличии Fast Item Frames отключите itemFrameMapCulling в config/moreculling.toml', -60);
+  } else if (mod.id === 'culllessleaves-reforged') {
+    addSynergy(['entity-culling', 'embeddium', 'emberbium'], 'Отсекает внутренние слои листвы в лесах, снижая перерисовку геометрии и теней на пару с Entity Culling', 80);
   } else if (mod.id === 'fast-item-frames') {
     addSynergy(['enhanced-block-entities-reloaded'], 'Дополняет EBER оптимизацией настенных рамок на складах', 80);
+    addOverlap(['more-culling-reforged'], 'Пересекается с куллингом рамок MoreCulling — отключите itemFrameMapCulling в MoreCulling', -50);
   }
 
   // TPS / Farm / Create / GeckoLib synergy
@@ -4166,22 +4395,35 @@ export function evaluateModImpactInPack(
   } else if (mod.id === 'sodium-embeddium-dynamic-lights') {
     addSynergy(['sodium-embeddium-options-api', 'emberbium', 'embeddium'], 'Добавляет динамический свет факелов/дропа поверх Emberbium/Embeddium и Options API без дублирования Chloride', 100);
   } else if (mod.id === 'fastload') {
-    addSynergy(['ksyxis', 'modernfix'], 'Ускоряет загрузку первых чанков мира в паре с Ksyxis и ModernFix', 100);
+    addSynergy(['modernfix', 'smooth-boot-reloaded'], 'Урезает лишний прогрев чанков при входе в мир, безопасно дополняя ModernFix и сохранность автоферм на спавне', 90);
   } else if (mod.id === 'ksyxis') {
-    addSynergy(['fastload', 'modernfix'], 'Убирает прогрев спавна (в паре с Fastload даёт мгновенный вход; осторожно с автофермами на спавне)', 70);
+    addSynergy(['modernfix'], 'Полностью пропускает спавн-чанки при входе (быстрее старт тестовых миров, но отключает фермы в spawn chunks)', 60);
   }
 
   // CPU input & audio & LOD & recipes & QoL
-  if (mod.id === 'ixeris' && (withoutSet.has('stutterfix-reforged') || withoutSet.has('threadtweak-reforged'))) {
-    addSynergy(['stutterfix-reforged', 'threadtweak-reforged'], 'Убирает статтеры ввода мыши и выравнивает фреймтайм потоков CPU', 110);
+  if (mod.id === 'ixeris' && (withoutSet.has('stutterfix-reforged') || withoutSet.has('threadtweak-reforged') || withoutSet.has('smooth-boot-reloaded'))) {
+    addSynergy(['stutterfix-reforged', 'threadtweak-reforged', 'smooth-boot-reloaded'], 'Убирает статтеры ввода мыши и выравнивает фреймтайм потоков CPU', 110);
   }
-  if (mod.id === 'threadtweak-reforged' && withoutSet.has('stutterfix-reforged')) {
-    addSynergy(['stutterfix-reforged'], 'Приоритезация потоков дополняет контроль кадров StutterFix', 85);
-  } else if (mod.id === 'stutterfix-reforged' && (withoutSet.has('threadtweak-reforged') || withoutSet.has('ixeris'))) {
-    addSynergy(['ixeris', 'threadtweak-reforged'], 'Согласует кадр с асинхронным вводом Ixeris и распределением потоков CPU', 95);
+  if (mod.id === 'threadtweak-reforged' || mod.id === 'smooth-boot-reloaded') {
+    if (withoutSet.has('ixeris')) {
+      addSynergy(['ixeris'], 'Управляет приоритетами потоков CPU в паре с асинхронным вводом Ixeris', 80);
+    }
+    if (withoutSet.has('stutterfix-reforged')) {
+      addOverlap(['stutterfix-reforged'], 'Пересекается по управлению приоритетами/воркерами потоков со StutterFix-Reforged — оставьте один планировщик', -80);
+    }
+  } else if (mod.id === 'stutterfix-reforged') {
+    if (withoutSet.has('ixeris')) {
+      addSynergy(['ixeris'], 'Согласует кадр и распределение потоков CPU с асинхронным вводом Ixeris', 95);
+    }
+    if (withoutSet.has('threadtweak-reforged') || withoutSet.has('smooth-boot-reloaded')) {
+      addOverlap(['threadtweak-reforged', 'smooth-boot-reloaded'], 'Пересечение планировщиков: StutterFix уже настраивает потоки (ThreadTweak / Smooth Boot излишни)', -70);
+    }
   }
   if (mod.id === 'packet-fixer') {
-    addSynergy(['connectivity', 'krypton-reno', 'modernfix'], 'Снимает лимиты размера NBT и сетевых пакетов Forge 1.20.1, предотвращая краши больших предметов и чанков даже в сингле', 90);
+    addSynergy(['connectivity', 'krypton-reno', 'krypton-hybrid', 'aegisnetworking-krypton-hybrid', 'modernfix'], 'Снимает лимиты размера NBT и сетевых пакетов Forge 1.20.1, предотвращая краши больших предметов и чанков даже в сингле', 90);
+  }
+  if (mod.id === 'toast-control') {
+    addSynergy(['placebo', 'fastvancements', 'badoptimizations'], 'Снижает всплывающий шум тостов рецептов и достижений без перегрузки интерфейса (поверх Placebo)', 80);
   }
   if (mod.id === 'fastvancements') {
     addSynergy(['badoptimizations', 'modernfix'], 'Кэширует проверки дерева достижений без фризов при подборе лута и открытии рецептов', 85);
@@ -4198,13 +4440,56 @@ export function evaluateModImpactInPack(
     }
   } else if (mod.id === 'particull' && withoutSet.has('particle-core')) {
     addOverlap(['particle-core'], 'Перекрыт более комплексным Particle Core', -80);
+  } else if (mod.id === 'particull' && (hasRenderCore || withoutSet.has('entity-culling'))) {
+    addSynergy(['entity-culling', 'embeddium', 'emberbium'], 'Лёгкое отсечение скрытых частиц за стенами и вне экрана без лишней нагрузки на слабых ПК', 50);
   }
   if (mod.id === 'accelerated-rendering' && withoutSet.has('flerovium')) {
     addSynergy(['flerovium'], 'Совместно ускоряют толпы мобов (Compute) и предметы/частицы (Flerovium), если хватает VRAM', 60);
   }
+  if (mod.id === 'amd-fsr-upscaler-render-scale-for-embeddium' && hasRenderCore) {
+    addSynergy(['embeddium', 'emberbium'], 'Апскейлит 3D-рендер (AMD FSR 1.0), разгружая видеоядро без замыливания HUD', 80);
+  }
+  if ((mod.id === 'dynamic-fps' || mod.id === 'dynamicrenderdistance') && withoutSet.size > 0) {
+    const coreTargets = ['embeddium', 'emberbium', 'modernfix'].filter(id => withoutSet.has(id));
+    interactions.push({
+      kind: 'context',
+      targetIds: coreTargets,
+      targetNames: coreTargets.map(id => MOD_BY_ID.get(id)?.name || id),
+      summary:
+        mod.id === 'dynamic-fps'
+          ? 'Снижает FPS, рендер и звуковую нагрузку до минимума при сворачивании или неактивном окне игры'
+          : 'Адаптивно регулирует дальность прорисовки под целевой FPS для плавной игры на слабом ПК и встройке',
+      impactDelta: 0,
+    });
+  }
+  if ((mod.id === 'spark' || mod.id === 'observable') && withoutSet.size > 0) {
+    const diagTargets = (mod.id === 'spark'
+      ? ['servercore', 'krypton-reno', 'krypton-hybrid']
+      : ['flywheel', 'architectury-api', 'kotlin-for-forge']
+    ).filter(id => withoutSet.has(id));
+    interactions.push({
+      kind: 'context',
+      targetIds: diagTargets,
+      targetNames: diagTargets.map(id => MOD_BY_ID.get(id)?.name || id),
+      summary:
+        mod.id === 'spark'
+          ? 'Встроенный профилировщик CPU/TPS/GC (/spark profiler): помогает точечно отловить источник лагов на сервере и клиенте'
+          : 'Наглядно подсвечивает в мире самые тяжёлые механизмы Create, блок-сущности и спавнеры по времени тика',
+      impactDelta: 0,
+    });
+  }
   if (mod.id === 'fast-sounds') {
     addSynergy(['soundgc', 'thulium'], 'Кэш OpenAL + очистка буферов (SoundGC / Thulium) без дублирования', 100);
     addSynergy(['reload-looping-sound-fix'], 'Сохраняет зацикленные звуки после F3+T (MC-194284)', 60);
+    if (!withoutSet.has('soundgc') && !withoutSet.has('thulium') && withoutSet.size > 0) {
+      interactions.push({
+        kind: 'context',
+        targetIds: ['ixeris', 'modernfix'].filter(id => withoutSet.has(id)),
+        targetNames: ['ixeris', 'modernfix'].filter(id => withoutSet.has(id)).map(id => MOD_BY_ID.get(id)?.name || id),
+        summary: 'Кэширует декодированные аудио-буферы OpenAL, устраняя статтеры при первом воспроизведении звуков',
+        impactDelta: 0,
+      });
+    }
   } else if (mod.id === 'soundgc' || mod.id === 'thulium') {
     addSynergy(['fast-sounds'], 'Дополняет Fast Sounds очисткой/оптимизацией буферов OpenAL и GC аудио-потока', 80);
   } else if (mod.id === 'reload-looping-sound-fix') {
@@ -4283,13 +4568,30 @@ export function evaluateModImpactInPack(
 
   if ((mod.id === 'flywheel' || mod.id === 'vanillin') && (withoutSet.has('oculus') || withoutSet.has('emberlens'))) {
     const shaderTargets = ['oculus', 'emberlens'].filter(id => withoutSet.has(id));
-    interactions.push({
-      kind: 'context',
-      targetIds: shaderTargets,
-      targetNames: shaderTargets.map(id => MOD_BY_ID.get(id)?.name || id),
-      summary: 'С шейдерами Oculus/Emberlens GPU-инстансинг Flywheel 1.0 отключается без моста совместимости (Iris & Oculus Flywheel Compat / Colorwheel) — возможен откат на CPU-рендер механизмов Create',
-      impactDelta: 0,
-    });
+    if (withoutSet.has('iris-oculus-flywheel-compat')) {
+      addSynergy(
+        ['iris-oculus-flywheel-compat', ...shaderTargets],
+        'Мост Iris & Oculus Flywheel Compat сохраняет аппаратный GPU-инстансинг кинетики Create даже при включённых шейдерах',
+        90
+      );
+    } else {
+      interactions.push({
+        kind: 'context',
+        targetIds: shaderTargets,
+        targetNames: shaderTargets.map(id => MOD_BY_ID.get(id)?.name || id),
+        summary: 'С шейдерами Oculus/Emberlens GPU-инстансинг Flywheel 1.0 отключается без моста совместимости (Iris & Oculus Flywheel Compat / Colorwheel) — возможен откат на CPU-рендер механизмов Create',
+        impactDelta: 0,
+      });
+    }
+  }
+  if (mod.id === 'iris-oculus-flywheel-compat') {
+    if (withoutSet.has('flywheel') && (withoutSet.has('oculus') || withoutSet.has('emberlens'))) {
+      addSynergy(
+        ['flywheel', 'oculus', 'emberlens'],
+        'Возвращает аппаратный GPU-инстансинг механизмов Create (Flywheel) при активных шейдерах Oculus/Emberlens',
+        150
+      );
+    }
   }
 
   if (mod.id === 'gputape' && (withoutSet.has('oculus') || withoutSet.has('emberlens'))) {
@@ -4369,11 +4671,12 @@ export function evaluateModImpactInPack(
   const withoutHasAnyC2ME =
     withoutSet.has('concurrent-chunk-management-engine-forge-c2me') ||
     withoutSet.has('c2me-concurrent-chunk-management-engine') ||
-    withoutSet.has('c2mer');
+    withoutSet.has('c2mer') ||
+    withoutSet.has('hc-harichunk');
   if (mod.id === 'delta-chunk' && (withoutHasAnyC2ME || withoutSet.has('parallel-world-save'))) {
     addOverlap(
       withoutHasAnyC2ME
-        ? ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer']
+        ? ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer', 'hc-harichunk']
         : ['parallel-world-save'],
       'Конкуренция перехватчиков записи чанков на диск — оставьте основной асинхронный движок без Delta Chunk',
       -120
@@ -4381,7 +4684,7 @@ export function evaluateModImpactInPack(
   } else if (mod.id === 'parallel-world-save' && (withoutHasAnyC2ME || withoutSet.has('delta-chunk'))) {
     addOverlap(
       withoutHasAnyC2ME
-        ? ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer']
+        ? ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer', 'hc-harichunk']
         : ['delta-chunk'],
       'Пересечение асинхронного сохранения мира с C2ME / Delta Chunk на уровне записи регионов чанков',
       -90

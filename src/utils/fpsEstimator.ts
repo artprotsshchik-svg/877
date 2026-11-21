@@ -55,6 +55,11 @@ const FPS_WEIGHT_OVERRIDE: Record<string, number> = {
   'falling-blocks-fps-fix': 0.03,
   lightstar: 0.03,
   'let-me-despawn': 0.02,
+  'iris-oculus-flywheel-compat': 0.06,
+  'toast-control': 0.01,
+  fastload: 0.01,
+  ksyxis: 0.01,
+  'fix-gpu-memory-leak': 0.01,
 };
 
 /**
@@ -142,6 +147,9 @@ export function estimateFpsRange(
     }
     if ((id === 'faster-iris-shadow-mapper' || id === 'shadowlod') && !hasShaders) {
       w = 0.01;
+    }
+    if (id === 'iris-oculus-flywheel-compat' && (!hasShaders || !selectedSet.has('flywheel'))) {
+      w = 0.0;
     }
 
     const clampedW = Math.max(0, Math.min(0.48, w));

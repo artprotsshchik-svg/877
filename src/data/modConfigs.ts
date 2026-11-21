@@ -47,9 +47,12 @@ export const MOD_RECOMMENDED_CONFIGS: ModConfigEntry[] = [
     modName: 'C2ME-Forge (C2MEF)',
     filePath: 'config/c2me.toml',
     title: 'Стабильные потоки генерации чанков на Forge',
-    note: 'Отключение noTickViewDistance предотвращает конфликты миксинов и утечки чанков.',
+    note: 'Отключение noTickViewDistance предотвращает конфликты миксинов и утечки чанков. Для сборок с Terralith / Alex\'s Caves ограничивайте globalExecutorParallelism до числа физических ядер CPU.',
     content: `[noTickViewDistance]
 enabled = false
+
+[generalConfig]
+globalExecutorParallelism = 4
 
 [ioSystem]
 asyncChunkio = true`,
@@ -59,19 +62,21 @@ asyncChunkio = true`,
     modName: 'C2ME (Fabric через Sinytra)',
     filePath: 'config/c2me.toml',
     title: 'Безопасный режим C2ME через Sinytra Connector',
-    note: 'Обязательно выключите noTickViewDistance при запуске поверх Forge 1.20.1.',
+    note: 'Обязательно выключите noTickViewDistance при запуске поверх Forge 1.20.1 и ограничьте globalExecutorParallelism под число физических ядер (особенно с Terralith / Alex\'s Caves).',
     content: `[noTickViewDistance]
-enabled = false`,
+enabled = false
+
+[generalConfig]
+globalExecutorParallelism = 4`,
   },
   {
     modId: 'modernfix',
     modName: 'ModernFix',
     filePath: 'config/modernfix-mixins.properties',
     title: 'Рекомендуемые флаги памяти и запуска',
-    note: 'Dynamic Resources экономит до 30–50% RAM на ресурсах модов.',
+    note: 'Dynamic Resources экономит до 30–50% RAM на ресурсах модов. Если Create или Distant Horizons нестабильны, отключите только dynamic_resources (ценой +0.5–1.5 ГБ ОЗУ).',
     content: `mixin.perf.dynamic_resources=true
-mixin.perf.faster_item_rendering=true
-mixin.bugfix.packet_threading=true`,
+mixin.perf.faster_item_rendering=true`,
   },
   {
     modId: 'sodium-chloride',
@@ -148,7 +153,8 @@ threadPriority = "BALANCED"`,
   "blockEntityWhitelist": [
     "minecraft:beacon",
     "create:belt",
-    "create:flywheel"
+    "create:flywheel",
+    "create:*_contraption"
   ],
   "tickCulling": true
 }`,
@@ -189,6 +195,47 @@ min_simulation_distance = 6`,
     "minecraft:wither"
   ]
 }`,
+  },
+  {
+    modId: 'alltheleaks-memory-leak-fix',
+    modName: 'AllTheLeaks (Memory Leak Fix)',
+    filePath: 'config/alltheleaks-common.toml',
+    title: 'Безопасная дедупликация ингредиентов без крашей рецептов',
+    note: 'ingredientDedupe экономит сотни мегабайт RAM в тяжёлых паках 200+ модов; при редком сбое конкретного кастомного рецепта отключите именно его.',
+    content: `[memory]
+ingredientDedupe = true`,
+  },
+  {
+    modId: 'ixeris',
+    modName: 'Ixeris',
+    filePath: 'config/ixeris.json',
+    title: 'Стабильный Raw Input при игре в полноэкранном режиме с шейдерами',
+    note: 'Только клиентский мод. Если в полноэкранном режиме с шейдерами камера дёргается или мышь залипает, переключите bufferedRawInput в false.',
+    content: `{
+  "bufferedRawInput": true,
+  "separateEventThread": true
+}`,
+  },
+  {
+    modId: 'stutterfix-reforged',
+    modName: 'StutterFix-Reforged',
+    filePath: 'config/stutterfix.toml',
+    title: 'Рекомендуемый режим без конфликтов со сторонними планировщиками',
+    note: 'Не совмещайте с ThreadTweak или Smooth Boot. В случае ручного тюнинга приоритетов используйте только один регулятор потоков.',
+    content: `[threading]
+optimizeMainThreadPriority = true
+optimizeRenderThread = true`,
+  },
+  {
+    modId: 'more-culling-reforged',
+    modName: 'More Culling Reforged',
+    filePath: 'config/moreculling.toml',
+    title: 'Безопасный профиль без артефактов на модовых блоках и листве',
+    note: 'Отключайте куллинг листвы в More Culling, если используете CullLessLeaves; для рамок не совмещайте с Fast Item Frames.',
+    content: `useBlockStateCulling = true
+useItemFrameCulling = true
+leavesCullingMode = "DEFAULT"
+entityModelCulling = false`,
   },
 ];
 

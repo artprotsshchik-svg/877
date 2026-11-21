@@ -45,12 +45,16 @@ test('all mods have valid CurseForge URLs, non-empty fields, and 100% MOD_GROUPS
   }
 });
 
-test('both curated presets (Nvidium reference + Alloyium counterpart) have zero conflicts, zero warnings, 7/7 subsystem coverage, and zero red mods', async () => {
+test('all 6 curated presets have zero conflicts, zero warnings, 7/7 subsystem coverage, and zero red mods', async () => {
   const { summarizeAssemblyImpact } = await import('./modAnalyzer.ts');
-  assert.equal(MOD_PRESETS.length, 2, `Expected 2 curated presets, got ${MOD_PRESETS.length}`);
+  assert.equal(MOD_PRESETS.length, 6, `Expected 6 curated presets, got ${MOD_PRESETS.length}`);
   const expectedIds = [
     'user-nvidium-emberbium',
     'user-alloyium-embeddium',
+    'shaders-optimum',
+    'create-industry-shaders',
+    'multiplayer-heavy-server',
+    'potato-integrated-gpu',
   ];
   for (const id of expectedIds) {
     assert.ok(MOD_PRESETS.some(p => p.id === id), `Missing expected preset "${id}"`);
@@ -168,9 +172,12 @@ test('Fabric-only originals (Lithium, Krypton) are flagged red for Forge while t
   assert.equal(getBaseHealthTier(fastchest), 'yellow');
   assert.equal(getBaseHealthTier(kryptonHybrid), 'lime');
 
+  const kryptonFox = MODS_DATABASE.find(m => m.id === 'krypton-foxified')!;
+  assert.equal(isUnsupportedOnForge(kryptonFox), true);
+  assert.equal(getCheckerTier(kryptonFox, new Set()).tier, 'red');
   const nfCheck = analyzeSelection(['embeddium', 'krypton-foxified']);
   assert.equal(nfCheck.warnings.length, 1);
-  assert.equal(nfCheck.warnings[0].severity, 'yellow');
+  assert.equal(nfCheck.warnings[0].severity, 'red');
 });
 
 test('Nvidium conflicts with Alloyium and Oculus, while Emberlens requires Emberbium and conflicts with Oculus/Embeddium', () => {
@@ -231,8 +238,13 @@ test('buildSmartAssembly adapts to gpu, server mode, goal, shaders, create, and 
     if (prefs.mode === 'hybrid-server') {
       assert.ok(modIds.includes('krypton-hybrid'));
       assert.ok(!modIds.includes('krypton-reno'));
-    } else {
+      assert.ok(!modIds.includes('radium-re-reforged'));
+      assert.ok(!modIds.includes('c2mer'));
+      assert.ok(!modIds.includes('vmp-forge'));
+    } else if (prefs.mode === 'server') {
       assert.ok(modIds.includes('krypton-reno'));
+    } else {
+      assert.ok(!modIds.includes('krypton-reno'));
     }
     if (prefs.goal === 'max-safe') {
       assert.ok(modIds.includes('structure-dfu-cache'));
@@ -1006,10 +1018,12 @@ test('synergy audit fixes: Emberbium vs Oculus/Alloyium, Nvidium symmetry, HC-Ha
   const tritiumClash = analyzeSelection(['culllessleaves-reforged', 'tritium']);
   assert.ok(tritiumClash.conflicts.length >= 1);
 
-  // Bobby Reforged is clean standalone, but flagged redundant & cleaned when Distant Horizons is active
-  const bobbySolo = analyzeSelection(['embeddium', 'bobby-reforged']);
+  // Bobby Reforged is clean standalone with RAM guard, warns without ModernFix+FerriteCore, and is cleaned when Distant Horizons is active
+  const bobbyNoRamGuard = analyzeSelection(['embeddium', 'bobby-reforged']);
+  assert.ok(bobbyNoRamGuard.warnings.some(w => w.modId === 'bobby-reforged' && w.fixModIds?.includes('modernfix')));
+  const bobbySolo = analyzeSelection(['embeddium', 'modernfix', 'ferritecore', 'bobby-reforged']);
   assert.equal(bobbySolo.warnings.length, 0);
-  const bobbyWithDh = analyzeSelection(['embeddium', 'distant-horizons', 'bobby-reforged']);
+  const bobbyWithDh = analyzeSelection(['embeddium', 'modernfix', 'ferritecore', 'distant-horizons', 'bobby-reforged']);
   assert.ok(bobbyWithDh.warnings.some(w => w.modId === 'bobby-reforged' && w.severity === 'yellow'));
   const fixedDh = smartFixAssembly(['embeddium', 'distant-horizons', 'bobby-reforged']);
   assert.ok(!fixedDh.includes('bobby-reforged'));
@@ -1720,7 +1734,7 @@ test('optimized presets and bloat-free buildSmartAssembly achieve high scores wi
     assert.equal(summary.overlaps.length, 0, `Unexpected overlaps for ${JSON.stringify(prefs)}`);
     assert.equal(summary.zeroOrLowImpactIds.length, 0, `Unexpected zero-impact mods: ${summary.zeroOrLowImpactIds.join(',')}`);
 
-    for (const forbidden of ['restmode', 'more-culling-reforged', 'better-biome-reblend', 'geckolib-animation-optimizer', 'servercore', 'connectivity', 'cupboard']) {
+    for (const forbidden of ['restmode', 'more-culling-reforged', 'better-biome-reblend', 'geckolib-animation-optimizer', 'servercore', 'connectivity', 'cupboard', 'krypton-reno']) {
       assert.ok(!modIds.includes(forbidden), `Singleplayer profile should not include ${forbidden}`);
     }
     assert.ok(summary.assemblyScore >= 90, `Expected score >= 90 for ${JSON.stringify(prefs)}, got ${summary.assemblyScore}`);
@@ -2006,10 +2020,10 @@ test('evaluateDubiousMods classifies clean Sinytra Nvidium as low nuance while f
     'alternate-current',
     'entity-collision-optimization',
     'stutterfix-reforged',
-    'threadtweak-reforged',
   ]) {
     assert.ok(heavyBalancedServer.modIds.includes(expectedId), `Expected heavy balanced server to include ${expectedId}`);
   }
+  assert.ok(!heavyBalancedServer.modIds.includes('threadtweak-reforged'), 'Expected single scheduler without threadtweak overlap');
   assert.equal(analyzeSelection(heavyBalancedServer.modIds).conflicts.length, 0);
 
   const balancedShaders = buildSmartAssembly({
@@ -2267,6 +2281,8 @@ test('obvious duplicate-port conflicts and non-obvious cross-mod co-work checks,
   assert.ok(dhC2me.interactions.some(i => i.kind === 'context' && i.summary.includes('CPU')));
   const dhC2meDubious = evaluateDubiousMods([
     'embeddium',
+    'modernfix',
+    'ferritecore',
     'distant-horizons',
     'concurrent-chunk-management-engine-forge-c2me',
   ]);
@@ -2529,7 +2545,104 @@ test('isOutdatedOrUselessMod, shouldHideMod toggle, and persistent hideOutdatedU
   assert.equal(decoded?.builderPrefs?.hideOutdatedUseless, false);
 });
 
+test('Blocks 1-4 technical audit: Fastload/Ksyxis, SuperChunk/CLab asymmetric rules, HC-HariChunk, RAM guard, schedulers, culling, Create+Shaders compat, and 6 presets', async () => {
+  const { MOD_BY_ID, evaluateModImpactInPack, getRuleConflictingIds, summarizeAssemblyImpact } = await import('./modAnalyzer.ts');
 
+  // Block 1: Fastload vs Ksyxis conflict + smartFixAssembly keeping strictly one
+  const fastKsyx = analyzeSelection(['modernfix', 'fastload', 'ksyxis']);
+  assert.ok(fastKsyx.conflicts.some(c => c.matchedIds.includes('fastload') && c.matchedIds.includes('ksyxis')));
+  const fixedFastKsyx = smartFixAssembly(['modernfix', 'fastload', 'ksyxis']);
+  assert.equal([ 'fastload', 'ksyxis' ].filter(id => fixedFastKsyx.includes(id)).length, 1);
 
+  // Block 1: SuperChunk asymmetric hub rule (conflicts with Noisiumed and C2MEF, without making Noisiumed <-> C2MEF conflict)
+  const superNois = analyzeSelection(['superchunk', 'noisiumed']);
+  assert.ok(superNois.conflicts.some(c => c.matchedIds.includes('superchunk') && c.matchedIds.includes('noisiumed')));
+  const superC2me = analyzeSelection(['superchunk', 'concurrent-chunk-management-engine-forge-c2me']);
+  assert.ok(superC2me.conflicts.some(c => c.matchedIds.includes('superchunk')));
+  const cleanNoisC2me = analyzeSelection(['embeddium', 'modernfix', 'ferritecore', 'noisiumed', 'concurrent-chunk-management-engine-forge-c2me']);
+  assert.equal(cleanNoisC2me.conflicts.length, 0);
 
+  // Block 1: HC-HariChunk included in C2ME world-save / dimthread overlaps & smartFix
+  const hariDim = analyzeSelection(['hc-harichunk', 'dimensional-threading-reforked']);
+  assert.ok(hariDim.conflicts.length >= 1);
+  const hariSave = analyzeSelection(['modernfix', 'ferritecore', 'hc-harichunk', 'parallel-world-save']);
+  assert.ok(hariSave.warnings.some(w => w.modId === 'parallel-world-save' && w.severity === 'yellow'));
+  assert.ok(getRuleConflictingIds('krypton-hybrid').length >= 0);
 
+  // Block 1: Packet Fixer synergy with Krypton Hybrid / AegisNetworking
+  const pfHybrid = evaluateModImpactInPack(MOD_BY_ID.get('packet-fixer')!, new Set(['krypton-hybrid', 'packet-fixer']));
+  assert.ok(pfHybrid.interactions.some(i => i.kind === 'synergy' && i.targetIds.includes('krypton-hybrid')));
+
+  // Block 1: Hybrid server strictly excludes Radium Re-Reforged, C2ME*, VMP*
+  const hybridBuild = buildSmartAssembly({
+    ...INITIAL_BUILDER_PREFS,
+    mode: 'hybrid-server',
+    goal: 'max-safe',
+    packScale: 'heavy',
+  });
+  for (const banned of ['radium-re-reforged', 'concurrent-chunk-management-engine-forge-c2me', 'c2mer', 'hc-harichunk', 'vmp-forge', 'krypton-reno']) {
+    assert.ok(!hybridBuild.modIds.includes(banned), `hybrid-server must exclude ${banned}`);
+  }
+  assert.ok(hybridBuild.modIds.includes('krypton-hybrid'));
+
+  // Block 2: GPUTape vs Fix GPU Memory Leak overlap, LOD/Chunk RAM guard, and Create + Shaders companions
+  const gpuOverlap = analyzeSelection(['embeddium', 'gputape', 'fix-gpu-memory-leak']);
+  assert.ok(gpuOverlap.warnings.some(w => w.modId === 'fix-gpu-memory-leak' && w.severity === 'yellow'));
+  const fixedGpu = smartFixAssembly(['embeddium', 'gputape', 'fix-gpu-memory-leak']);
+  assert.ok(fixedGpu.includes('gputape') && !fixedGpu.includes('fix-gpu-memory-leak'));
+
+  const c2meNoRam = analyzeSelection(['embeddium', 'concurrent-chunk-management-engine-forge-c2me']);
+  assert.ok(c2meNoRam.warnings.some(w => w.fixModIds?.includes('modernfix') && w.fixModIds?.includes('ferritecore')));
+  const toggledC2me = toggleModSmart(['embeddium'], 'concurrent-chunk-management-engine-forge-c2me', { strict: true });
+  assert.ok(toggledC2me.nextIds.includes('modernfix') && toggledC2me.nextIds.includes('ferritecore'));
+  assert.equal(analyzeSelection(toggledC2me.nextIds).warnings.length, 0);
+
+  const createShadersBuild = buildSmartAssembly({
+    ...INITIAL_BUILDER_PREFS,
+    useCreate: true,
+    useShaders: true,
+    goal: 'max-safe',
+  });
+  for (const expectedCreateId of ['flywheel', 'vanillin', 'iris-oculus-flywheel-compat', 'duplicate-nbt-flattener', 'capability-fix-revived']) {
+    assert.ok(createShadersBuild.modIds.includes(expectedCreateId), `Create+Shaders build missing ${expectedCreateId}`);
+  }
+
+  // Block 3: Exclusive thread schedulers (StutterFix Reforged vs ThreadTweak Reforged vs Smooth Boot Reloaded)
+  const schedOverlap = analyzeSelection(['stutterfix-reforged', 'threadtweak-reforged']);
+  assert.ok(schedOverlap.warnings.some(w => w.modId === 'stutterfix-reforged' && w.severity === 'yellow'));
+  const fixedSched = smartFixAssembly(['stutterfix-reforged', 'threadtweak-reforged', 'smooth-boot-reloaded']);
+  assert.equal(['stutterfix-reforged', 'threadtweak-reforged', 'smooth-boot-reloaded'].filter(id => fixedSched.includes(id)).length, 1);
+
+  // Block 4: Culling overlaps, CLab asymmetric leaf culling, More Culling + EBER synergy, Sightline + Shaders, Toast Control + Placebo
+  const ecItem = analyzeSelection(['entity-culling', 'itemculler']);
+  assert.ok(ecItem.warnings.some(w => w.modId === 'itemculler' && w.severity === 'yellow'));
+  const clabLeaf = analyzeSelection(['clab', 'culllessleaves-reforged']);
+  assert.ok(clabLeaf.conflicts.some(c => c.matchedIds.includes('clab') && c.matchedIds.includes('culllessleaves-reforged')));
+  const moreFif = analyzeSelection(['more-culling-reforged', 'fast-item-frames', 'puzzles-lib']);
+  assert.ok(moreFif.warnings.some(w => w.modId === 'more-culling-reforged' || w.modId === 'fast-item-frames'));
+  const moreEber = evaluateModImpactInPack(
+    MOD_BY_ID.get('more-culling-reforged')!,
+    new Set(['embeddium', 'more-culling-reforged', 'enhanced-block-entities-reloaded', 'matlib'])
+  );
+  assert.ok(moreEber.interactions.some(i => i.kind === 'synergy' && i.targetIds.includes('enhanced-block-entities-reloaded')));
+
+  const sightlineShader = analyzeSelection(['embeddium', 'oculus', 'sodium-sightline']);
+  assert.ok(sightlineShader.warnings.some(w => w.modId === 'sodium-sightline' && w.severity === 'yellow'));
+  const toastPlacebo = analyzeSelection(['toast-control', 'placebo']);
+  assert.equal(toastPlacebo.warnings.length, 0);
+
+  // Block 4: All 6 presets meet strict quality gates (0 conflicts, 0 warnings, 0 overlaps, 0 dead mods, 7/7 subsystems, score >= 96)
+  for (const preset of MOD_PRESETS) {
+    const an = analyzeSelection(preset.modIds);
+    const sum = summarizeAssemblyImpact(preset.modIds, an, {
+      ...INITIAL_BUILDER_PREFS,
+      ...preset.recommendedPrefs,
+    });
+    assert.equal(an.conflicts.length, 0, `${preset.id}: unexpected conflicts`);
+    assert.equal(an.warnings.length, 0, `${preset.id}: unexpected warnings`);
+    assert.equal(sum.overlaps.length, 0, `${preset.id}: unexpected overlaps`);
+    assert.equal(sum.zeroOrLowImpactIds.length, 0, `${preset.id}: unexpected dead mods`);
+    assert.equal(sum.coveredSubsystems.length, 7, `${preset.id}: expected 7/7 subsystems`);
+    assert.ok(sum.assemblyScore >= 96, `${preset.id}: expected score >= 96, got ${sum.assemblyScore}`);
+  }
+});

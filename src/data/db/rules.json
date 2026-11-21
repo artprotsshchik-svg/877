@@ -133,7 +133,7 @@
       "C2ME (Concurrent Chunk Management Engine)",
       "Concurrent Chunk Management Engine - Forge (C2MEF)",
       "C2MER",
-      "HC-HariChunk"
+      "HC: HariChunk"
     ],
     "explanation": "Все эти варианты реализуют многопоточное распараллеливание чанков C2ME. Одновременная установка двух портов вызывает конфликт миксинов и потоков генерации мира.",
     "recommendation": "Выберите строго один вариант: оригинальный C2ME через Sinytra Connector либо нативный порт C2ME-Forge (C2MEF)."
@@ -512,7 +512,8 @@
       "Dimensional Threading Reforked (серверное)",
       "C2ME (Concurrent Chunk Management Engine)",
       "Concurrent Chunk Management Engine - Forge (C2MEF)",
-      "C2MER"
+      "C2MER",
+      "HC: HariChunk"
     ],
     "explanation": "C2ME распараллеливает генерацию и I/O чанков в глобальных пулах потоков, а Dimensional Threading выносит тики каждого измерения (Overworld/Nether/End) в отдельные воркеры. Совместный перехват карт чанков и сущностей вызывает гонки потоков (ConcurrentModificationException) и повреждение мира.",
     "recommendation": "Для серверов используйте проверенный C2MEF (или Fabric C2ME через Sinytra) без Dimensional Threading Reforked."
@@ -570,6 +571,59 @@
     ],
     "explanation": "Все четыре мода используют схожие миксины пропуска тиков (tick-skipping / hibernation) далёких сущностей. Совместная установка вызывает двойной перехват тиков мобов и конфликты с ИИ.",
     "recommendation": "Вместо набора мелких скипперов выберите лидера группы Immersive Optimization (или максимум один лёгкий мод сна)."
+  },
+  {
+    "title": "Дублирование ускорителей входа на спавне (Fastload ↔ Ksyxis)",
+    "category": "Загрузка игры и ресурспаков",
+    "conflictingMods": [
+      "Fastload",
+      "Ksyxis"
+    ],
+    "explanation": "Оба мода изменяют логику прогрева и удержания спавн-чанков при входе в мир (Fastload урезает начальный радиус загрузки, а Ksyxis полностью пропускает spawn chunks). Совместная установка избыточна и вызывает конфликт инициализации старта мира.",
+    "recommendation": "Выберите строго один вариант: Fastload (безопасен для автоферм на спавне) либо Ksyxis (для быстрого тестового входа)."
+  },
+  {
+    "title": "Конфликт SuperChunk с многопоточными движками и Noisium",
+    "category": "Чанки и генерация мира",
+    "conflictingMods": [
+      "SuperChunk",
+      "C2ME (Concurrent Chunk Management Engine)",
+      "Concurrent Chunk Management Engine - Forge (C2MEF)",
+      "C2MER",
+      "HC: HariChunk",
+      "Noisiumed",
+      "Noisium (архив)"
+    ],
+    "explanation": "SuperChunk вмешивается в конвейер генерации чанков и шума через OpenCL GPU-хуки, что несовместимо с многопоточными перехватчиками C2ME-семейства и оптимизатором шума Noisium/Noisiumed.",
+    "recommendation": "Удалите SuperChunk и используйте проверенную связку Noisiumed + Chunky (или C2MEF на чистом Forge-сервере)."
+  },
+  {
+    "title": "Конфликт регуляторов и планировщиков потоков CPU",
+    "category": "Потоки и процессор",
+    "conflictingMods": [
+      "ThreadTweak Reforged",
+      "Smooth Boot (Reloaded)",
+      "Threads",
+      "Thread Priorities",
+      "Thread Tweaks",
+      "Worker Threads"
+    ],
+    "explanation": "Все эти моды переназначают приоритеты и размеры рабочих пулов ForkJoinPool / Main / Render потоков Minecraft. Совместная установка приводит к перетягиванию приоритетов ОС и рывкам фреймтайма.",
+    "recommendation": "Выберите ровно один планировщик: Smooth Boot (Reloaded) для одиночной игры/лёгких сборок или ThreadTweak Reforged при ручной настройке приоритетов (а для 200+ модов рассмотрите только StutterFix-Reforged)."
+  },
+  {
+    "title": "Конфликт CLab с куллингом листвы",
+    "category": "Рендер, culling и FPS",
+    "conflictingMods": [
+      "CLab",
+      "CullLessLeaves Reforged",
+      "Leaves Culling",
+      "Sodium Leaf Culling (Unofficial)",
+      "Sodium/Embeddium Leaf Culling",
+      "Tritium"
+    ],
+    "explanation": "CLab перехватывает граф видимости и отсечения блоков и листвы, конфликтуя с выделенными модами куллинга листвы (артефакты крон и мигание граней).",
+    "recommendation": "Отключите CLab и используйте проверенную пару Entity Culling + CullLessLeaves Reforged."
   }
 ]
 

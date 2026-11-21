@@ -101,6 +101,7 @@
     "addonIds": [
       "faster-iris-shadow-mapper",
       "gputape",
+      "iris-oculus-flywheel-compat",
       "bons-dlss-diet-complementary-unbound"
     ],
     "memberIds": [
@@ -109,6 +110,7 @@
       "iris-shaders",
       "faster-iris-shadow-mapper",
       "gputape",
+      "iris-oculus-flywheel-compat",
       "bons-dlss-diet-complementary-unbound"
     ],
     "conflictReason": "Выбирайте один шейдерный движок: Oculus (под Embeddium) либо Emberlens (под Emberbium); оба несовместимы с Nvidium."
@@ -793,7 +795,8 @@
       "rinlib",
       "configured",
       "controlling",
-      "searchables"
+      "searchables",
+      "toast-control"
     ],
     "memberIds": [
       "geckolib-animation-optimizer",
@@ -819,6 +822,7 @@
       "configured",
       "controlling",
       "searchables",
+      "toast-control",
       "rubidium-fluid-render-fix",
       "anotherfix",
       "crash-doctor",

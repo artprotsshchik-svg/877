@@ -38,6 +38,7 @@ const ADDON_PARENT_PRIORITY: Record<string, { parents: string[]; relation: strin
   'gputape': { parents: ['oculus', 'emberlens', 'embeddium', 'emberbium'], relation: 'Фикс VRAM' },
   'bons-dlss-diet-complementary-unbound': { parents: ['oculus', 'emberlens'], relation: 'Аддон Complementary' },
   'unofficial-luxium-compatibility-luxium-oculus': { parents: ['oculus'], relation: 'Фикс Luxium' },
+  'iris-oculus-flywheel-compat': { parents: ['oculus', 'emberlens', 'flywheel'], relation: 'Мост Flywheel + Шейдеры' },
 
   'forgified-fabric-api': { parents: ['sinytra-connector'], relation: 'Зависимость' },
   'connector-extras': { parents: ['sinytra-connector'], relation: 'Мост совместимости' },
@@ -48,7 +49,8 @@ const ADDON_PARENT_PRIORITY: Record<string, { parents: string[]; relation: strin
   'matlib': { parents: ['enhanced-block-entities-reloaded'], relation: 'Зависимость' },
   'puzzles-lib': { parents: ['fast-item-frames'], relation: 'Зависимость' },
   'almanac': { parents: ['let-me-despawn'], relation: 'Зависимость' },
-  'placebo': { parents: ['fastsuite', 'fastworkbench', 'fastfurnace'], relation: 'Зависимость' },
+  'placebo': { parents: ['fastsuite', 'fastworkbench', 'fastfurnace', 'toast-control'], relation: 'Зависимость' },
+  'toast-control': { parents: ['placebo', 'fastvancements'], relation: 'Фильтр тостов' },
   'architectury-api': { parents: ['observable'], relation: 'Зависимость' },
   'rinlib': { parents: ['structure-dfu-cache'], relation: 'Зависимость' },
   'fzzy-config': { parents: ['particle-core', 'emi-loot', 'emiffect'], relation: 'Зависимость' },
@@ -73,11 +75,11 @@ const ADDON_PARENT_PRIORITY: Record<string, { parents: string[]; relation: strin
   'martensite-entity-tick-skiper': { parents: ['immersive-optimization', 'entitysleep'], relation: 'Перекрыт (ИИ)' },
   'mobtimizations': { parents: ['servercore'], relation: 'Перекрыт' },
   'parallel-world-save': {
-    parents: ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer'],
+    parents: ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer', 'hc-harichunk'],
     relation: 'Дубль I/O чанков',
   },
   'delta-chunk': {
-    parents: ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer', 'parallel-world-save'],
+    parents: ['concurrent-chunk-management-engine-forge-c2me', 'c2me-concurrent-chunk-management-engine', 'c2mer', 'hc-harichunk', 'parallel-world-save'],
     relation: 'Дубль I/O чанков',
   },
   'geckolib-animation-optimizer': { parents: ['geckolib'], relation: 'Оптимизатор GeckoLib' },

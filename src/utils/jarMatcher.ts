@@ -129,6 +129,10 @@ const JAR_ALIASES: Record<string, string> = {
   controlling: 'controlling',
   searchables: 'searchables',
   clothconfig: 'cloth-config-v12',
+  toastcontrol: 'toast-control',
+  irisoculusflywheelcompat: 'iris-oculus-flywheel-compat',
+  oculusflywheelcompat: 'iris-oculus-flywheel-compat',
+  flywheelcompat: 'iris-oculus-flywheel-compat',
 };
 
 const MOD_TOKEN_INDEX = (() => {

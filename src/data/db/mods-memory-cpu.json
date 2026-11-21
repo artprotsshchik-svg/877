@@ -1288,9 +1288,9 @@
     "status": "useful",
     "statusLabel": "Быстрый вход (ломает спавн-чанки)",
     "healthTier": "yellow",
-    "description": "Отключает ожидание прогрева чанков спавна при входе в мир (11.3M+ CF, активно поддерживается). Сильно ускоряет вход в одиночный мир, но переносит спайк генерации на момент после спавна и отключает прогрузку спавна.",
-    "bestAlternative": "Хорош для тестов и обычного сингла; не подходит для ванильных/Create ферм в spawn chunks.",
-    "warning": "Побочный эффект: отключает постоянную работу spawn chunks — ломает фермы на спавне и даёт кратковременную подгрузку чанков сразу после входа.",
+    "description": "Отключает ожидание прогрева чанков спавна при входе в мир (11.3M+ CF, активно поддерживается). Сильно ускоряет вход в одиночный мир, но отключает постоянную прогрузку spawn chunks. Не ставьте вместе с Fastload — оба решают одну задачу входа в мир.",
+    "bestAlternative": "Хорош для тестов и обычного сингла; не подходит для ванильных/Create ферм в spawn chunks (альтернатива — Fastload).",
+    "warning": "Побочный эффект: отключает постоянную работу spawn chunks и несовместим с Fastload.",
     "tags": [],
     "curseforgeUrl": "https://www.curseforge.com/minecraft/mc-mods/ksyxis",
     "groupId": "boot-loading",
@@ -1850,9 +1850,9 @@
     "isGroupLeader": false,
     "isGroupAddon": false,
     "addons": [],
-    "coveredBy": "ModernFix",
+    "coveredBy": "",
     "supersededBy": [
-      "modernfix"
+      "jasione"
     ]
   },
   {
@@ -1874,9 +1874,9 @@
     "isGroupLeader": false,
     "isGroupAddon": false,
     "addons": [],
-    "coveredBy": "ModernFix",
+    "coveredBy": "",
     "supersededBy": [
-      "modernfix"
+      "jasione"
     ]
   },
   {
@@ -1933,9 +1933,9 @@
     "status": "recommended",
     "statusLabel": "Мастхэв для ввода",
     "healthTier": "green",
-    "description": "Оптимизатор ввода от decce (миллионы загрузок). Устраняет дропы кадров при движении мыши за счет буферизованного Raw Input и отдельного потока опроса событий.",
-    "bestAlternative": "Отличный мод для идеальной плавности мыши на Windows.",
-    "warning": "",
+    "description": "Клиентский оптимизатор ввода от decce (миллионы загрузок). Устраняет дропы кадров при движении мыши за счёт буферизованного Raw Input и отдельного потока опроса событий. Только клиент — на выделенном сервере не нужен.",
+    "bestAlternative": "Мастхэв для клиента; в полноэкранном режиме с шейдерами при дёргании камеры проверьте bufferedRawInput в конфиге.",
+    "warning": "Только клиент (на сервере бесполезен).",
     "tags": [],
     "curseforgeUrl": "https://www.curseforge.com/minecraft/mc-mods/ixeris",
     "groupId": "cpu-threads",
@@ -2051,9 +2051,9 @@
     "status": "useful",
     "statusLabel": "Фикс микрофризов (Порт)",
     "healthTier": "yellow",
-    "description": "Forge-порт StutterFix: устраняет микрозадержки планировщика задач Minecraft (tick/render synchronization) на многоядерных процессорах.",
-    "bestAlternative": "Хорошо работает вместе с Ixeris и ThreadTweak Reforged.",
-    "warning": "",
+    "description": "Forge-порт StutterFix: регулирует распределение потоков планировщика задач Minecraft (tick/render synchronization) на многоядерных CPU и включает оптимизации фреймтайма.",
+    "bestAlternative": "Дополняет Ixeris; не смешивайте с ThreadTweak Reforged или Smooth Boot Reloaded (выберите строго один планировщик потоков).",
+    "warning": "Пересекается с ThreadTweak Reforged и Smooth Boot Reloaded — не ставьте два регулятора потоков одновременно.",
     "tags": [],
     "curseforgeUrl": "https://www.curseforge.com/minecraft/mc-mods/stutterfix-reforged",
     "groupId": "cpu-threads",
@@ -2395,8 +2395,8 @@
     "status": "useful",
     "statusLabel": "Фикс VRAM",
     "healthTier": "yellow",
-    "description": "Устраняет утечки видеопамяти при частой перезагрузке текстур или смене шейдеров.",
-    "bestAlternative": "GPUTape / GPUBooster.",
+    "description": "Сброс и очистка зависших OpenGL-ссылок видеопамяти при перезагрузке текстур и смене миров. В отличие от GPUTape не требует OpenGL 4.5+ DSA и безопасен на старых GPU / встройках.",
+    "bestAlternative": "Подходит для старых видеокарт и встроек без OpenGL 4.5+ (на современных GPU лучше один GPUTape — вместе их ставить не нужно).",
     "warning": "",
     "tags": [],
     "curseforgeUrl": "https://www.curseforge.com/minecraft/search?search=Fix%20GPU%20Memory%20Leak&class=mc-mods",
@@ -2405,10 +2405,7 @@
     "isGroupLeader": false,
     "isGroupAddon": false,
     "addons": [],
-    "coveredBy": "",
-    "supersededBy": [
-      "gputape"
-    ]
+    "coveredBy": ""
   },
   {
     "id": "memory-cleaning",
@@ -2461,9 +2458,9 @@
     "status": "useful",
     "statusLabel": "Безопасный конфиг",
     "healthTier": "yellow",
-    "description": "Преднастроенный конфиг ModernFix, отключающий спорные миксины для максимальной стабильности.",
-    "bestAlternative": "Ручная настройка modernfix-mixins.properties.",
-    "warning": "",
+    "description": "Пресет/рекомендация конфигурации ModernFix с отключённым Dynamic Resources ради совместимости с Create/Distant Horizons (увеличивает расход ОЗУ на +0.5–1.5 ГБ вместо экономии).",
+    "bestAlternative": "Если Create или DH работают стабильно с Dynamic Resources — используйте стандартный ModernFix.",
+    "warning": "Отключение Dynamic Resources повышает потребление RAM на +0.5–1.5 ГБ.",
     "tags": [],
     "curseforgeUrl": "https://www.curseforge.com/minecraft/search?search=Safe%20ModernFix%20Config&class=mc-mods",
     "groupId": "memory-core",
@@ -2620,9 +2617,9 @@
     "status": "useful",
     "statusLabel": "Ускорение входа в мир (Forge)",
     "healthTier": "yellow",
-    "description": "Официальный мод от StockiesLad (мульти-лоадер, включает нативный Forge 1.20.1). Оптимизирует синхронизацию генерации и загрузки первых чанков при заходе в мир (хорошо работает в паре с Ksyxis).",
-    "bestAlternative": "Полезный нативный компаньон к Ksyxis и ModernFix.",
-    "warning": "",
+    "description": "Официальный мод от StockiesLad (мульти-лоадер, включает нативный Forge 1.20.1). Снижает начальный радиус загрузки первых чанков при входе в мир. Выбирайте ЛИБО Fastload, ЛИБО Ksyxis — оба решают одну задачу и конфликтуют вместе.",
+    "bestAlternative": "Предпочтительнее Ksyxis, если в мире есть фермы на спавне; нельзя совмещать с Ksyxis.",
+    "warning": "Не совмещайте с Ksyxis — оба мода меняют логику загрузки спавн-чанков.",
     "tags": [
       "loading",
       "chunks",

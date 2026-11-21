@@ -231,34 +231,42 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
   }
 
   if (effectivePrefs.mode === 'hybrid-server') {
+    if (
+      activeAnchor?.id !== 'radium-re-reforged' &&
+      activeAnchor?.id !== 'radium-reforged' &&
+      activeAnchor?.id !== 'canary'
+    ) {
+      ids.delete('radium-re-reforged');
+    }
     ids.add('krypton-hybrid');
     ids.add('connectivity');
     ids.add('cupboard');
     ids.add('servercore');
     ids.add('fast-ip-ping');
     ids.add('spark');
-    notes.push('Выбран Krypton Hybrid (сжатие Zstd и фиксы для гибридных серверов Mohist/Arclight) вместо Krypton Reno.');
-    excluded.push({ name: 'Krypton Reno', reason: 'Заменён на Krypton Hybrid для совместимости с гибрид-ядром.' });
-  } else {
+    notes.push('Гибрид-сервер (Mohist / Arclight): выбран Krypton Hybrid, а C2ME, VMP и Radium/Lithium исключены для защиты от гонок потоков ядра.');
+    excluded.push(
+      { name: 'Krypton Reno', reason: 'Заменён на Krypton Hybrid для совместимости с гибрид-ядром.' },
+      { name: 'C2MEF / C2ME / VMP / Radium Re-Reforged', reason: 'Нестабильны поверх гибридных ядер Mohist/Arclight — используйте офлайн-предгенерацию Chunky.' }
+    );
+  } else if (effectivePrefs.mode === 'server') {
     ids.add('krypton-reno');
-    if (effectivePrefs.mode === 'server') {
-      ids.add('servercore');
-      ids.add('connectivity');
-      ids.add('cupboard');
-      ids.add('fast-ip-ping');
-      ids.add('spark');
-      notes.push('Для сетевой игры добавлены ServerCore, Connectivity (+ Cupboard), Fast IP Ping и Spark.');
-    } else {
-      ids.add('smooth-boot-reloaded');
-      notes.push('Для одиночной игры добавлен Smooth Boot (Reloaded) без лишних серверных/сетевых модов.');
-    }
+    ids.add('servercore');
+    ids.add('connectivity');
+    ids.add('cupboard');
+    ids.add('fast-ip-ping');
+    ids.add('spark');
+    notes.push('Для сетевой игры добавлены Krypton Reno, ServerCore, Connectivity (+ Cupboard), Fast IP Ping и Spark.');
+  } else {
+    excluded.push({ name: 'Krypton Reno / Hybrid', reason: 'В одиночной игре локальный Netty не даёт заметного прироста, но нативные библиотеки зависят от ОС.' });
+    notes.push('Одиночная игра: сетевые/серверные моды (Krypton Reno, ServerCore, Connectivity) не добавляются без надобности.');
   }
 
-  if (isHeavyPack && !isPotato) {
-    [
-      'stutterfix-reforged',
-      'threadtweak-reforged',
-    ].forEach(id => ids.add(id));
+  // Strictly one CPU/thread scheduler per assembly to prevent priority tug-of-war
+  if ((isHeavy || isHeavyPack) && !isPotato && activeAnchor?.id !== 'smooth-boot-reloaded' && activeAnchor?.id !== 'threadtweak-reforged') {
+    ids.add('stutterfix-reforged');
+  } else if (activeAnchor?.id !== 'stutterfix-reforged' && activeAnchor?.id !== 'threadtweak-reforged') {
+    ids.add('smooth-boot-reloaded');
   }
 
   if (effectivePrefs.mode !== 'singleplayer' && (isHeavy || (isHeavyPack && !isPotato))) {
@@ -274,8 +282,6 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
       'structure-layout-optimizer',
       'lightstar',
       'falling-blocks-fps-fix',
-      'stutterfix-reforged',
-      'threadtweak-reforged',
       'lightspeedre',
       'fast-item-frames',
       'immersive-optimization',
@@ -297,11 +303,11 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
     if (effectivePrefs.mode === 'singleplayer') {
       excluded.push({ name: 'ServerCore / Connectivity / Cupboard', reason: 'Сетевые моды исключены в одиночном режиме (в соло не дают прироста).' });
     }
-    excluded.push({ name: 'RestMode / More Culling / Better Biome Reblend', reason: 'Исключены из-за наложения с Dynamic FPS / CullLessLeaves и архивации Better Biome Reblend.' });
+    excluded.push({ name: 'RestMode / More Culling / Better Biome Reblend', reason: 'Исключены из-за наложения с Dynamic FPS / CullLessLeaves / Fast Item Frames и архивации Better Biome Reblend.' });
     notes.push(
       `Для максимальной сборки добавлены высокоэффективные моды без раздувания миксинов: Kerria, LightStar, Particle Core, ${
         recipeViewer === 'none' ? 'FastSuite (+ Placebo), ' : ''
-      }Structure DFU (+ RinLib)/Layout, Immersive Optimization, Falling Blocks FPS Fix, StutterFix + ThreadTweak и Fast Item Frames (+ Puzzles Lib).`
+      }Structure DFU (+ RinLib)/Layout, Immersive Optimization, Falling Blocks FPS Fix, StutterFix-Reforged и Fast Item Frames (+ Puzzles Lib).`
     );
   } else {
     excluded.push({ name: 'FastSuite / Structure DFU Cache', reason: 'Опциональные кеши для тяжёлых сборок пропущены в лёгком/сбалансированном профиле.' });
@@ -328,6 +334,7 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
     if (effectivePrefs.useCreate) {
       ids.add('flywheel');
       ids.add('vanillin');
+      ids.add('iris-oculus-flywheel-compat');
     }
     excluded.push({
       name: 'Embeddium + Oculus + Alloyium + Nvidium',
@@ -391,10 +398,19 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
     ids.add('alternate-current');
     ids.add('entity-collision-optimization');
     ids.add('observable');
-    notes.push('Для Create/индустрии добавлены Flywheel, Vanillin, Alternate Current, Immersive Optimization и Observable.');
+    if (!isPotato) {
+      ids.add('duplicate-nbt-flattener');
+      ids.add('capability-fix-revived');
+    }
+    if (effectivePrefs.useShaders && effectivePrefs.goal !== 'potato') {
+      ids.add('iris-oculus-flywheel-compat');
+    }
+    notes.push('Для Create/индустрии добавлены Flywheel, Vanillin, Alternate Current, Immersive Optimization, Duplicate NBT / Capability Fix и Observable.');
   }
 
+  const isHybridServer = effectivePrefs.mode === 'hybrid-server';
   const useFabricC2ME =
+    !isHybridServer &&
     effectivePrefs.allowSinytra &&
     activeAnchor?.id !== 'concurrent-chunk-management-engine-forge-c2me' &&
     activeAnchor?.id !== 'c2mer' &&
@@ -402,13 +418,18 @@ export function buildSmartAssembly(prefs: AssemblyPreferences): SmartAssemblyRes
       (portStrategy === 'fabric-sinytra' && (effectivePrefs.mode !== 'singleplayer' || isHeavyPack)));
 
   const useNativeC2MEF =
+    !isHybridServer &&
     !useFabricC2ME &&
     activeAnchor?.id !== 'c2me-concurrent-chunk-management-engine' &&
     (activeAnchor?.id === 'concurrent-chunk-management-engine-forge-c2me' ||
       (!isPotato && (effectivePrefs.mode !== 'singleplayer' || isHeavyPack)));
 
-  const needVmp = effectivePrefs.mode !== 'singleplayer' && (isHeavy || (isHeavyPack && !isPotato));
+  const needVmp =
+    !isHybridServer &&
+    effectivePrefs.mode !== 'singleplayer' &&
+    (isHeavy || (isHeavyPack && !isPotato));
   const useFabricVMP =
+    !isHybridServer &&
     effectivePrefs.allowSinytra &&
     activeAnchor?.id !== 'vmp-forge' &&
     (activeAnchor?.id === 'very-many-players-vmp' || (portStrategy === 'fabric-sinytra' && needVmp));
@@ -805,10 +826,78 @@ export function smartFixAssembly(selectedIds: string[], prefs?: AssemblyPreferen
       }
     }
   }
+  if (prefs?.mode === 'hybrid-server') {
+    for (const unsafeHybridId of [
+      'concurrent-chunk-management-engine-forge-c2me',
+      'c2me-concurrent-chunk-management-engine',
+      'c2mer',
+      'hc-harichunk',
+      'vmp-forge',
+      'very-many-players-vmp',
+      'radium-re-reforged',
+      'radium-reforged',
+      'canary',
+      'lithium',
+    ]) {
+      if (unsafeHybridId !== focusId) {
+        next.delete(unsafeHybridId);
+      }
+    }
+  }
+
+  if (next.has('gputape') && next.has('fix-gpu-memory-leak')) {
+    if (focusId === 'fix-gpu-memory-leak') next.delete('gputape');
+    else next.delete('fix-gpu-memory-leak');
+  }
+
+  if (
+    next.has('stutterfix-reforged') &&
+    (next.has('threadtweak-reforged') || next.has('smooth-boot-reloaded'))
+  ) {
+    if (focusId === 'threadtweak-reforged' || focusId === 'smooth-boot-reloaded') {
+      next.delete('stutterfix-reforged');
+    } else {
+      next.delete('threadtweak-reforged');
+      next.delete('smooth-boot-reloaded');
+    }
+  }
+
+  if (next.has('entity-culling')) {
+    for (const peerId of ['itemculler', 'lcull', 'jem-adaptive-culling'] as const) {
+      if (next.has(peerId)) {
+        if (focusId === peerId) next.delete('entity-culling');
+        else next.delete(peerId);
+      }
+    }
+  }
+
+  if (next.has('more-culling-reforged') && next.has('fast-item-frames')) {
+    if (focusId === 'more-culling-reforged') next.delete('fast-item-frames');
+    else next.delete('more-culling-reforged');
+  }
+
+  if (next.has('sodium-sightline') && (next.has('oculus') || next.has('emberlens'))) {
+    if (focusId === 'sodium-sightline') {
+      next.delete('oculus');
+      next.delete('emberlens');
+    } else {
+      next.delete('sodium-sightline');
+    }
+  }
+
+  if (
+    next.has('iris-oculus-flywheel-compat') &&
+    focusId !== 'iris-oculus-flywheel-compat' &&
+    (!next.has('flywheel') || (!next.has('oculus') && !next.has('emberlens')))
+  ) {
+    next.delete('iris-oculus-flywheel-compat');
+  }
+
   const hasC2meInNext =
     next.has('concurrent-chunk-management-engine-forge-c2me') ||
     next.has('c2me-concurrent-chunk-management-engine') ||
-    next.has('c2mer');
+    next.has('c2mer') ||
+    next.has('hc-harichunk');
   if (hasC2meInNext) {
     for (const saveId of ['parallel-world-save', 'delta-chunk'] as const) {
       if (next.has(saveId)) {
@@ -816,6 +905,7 @@ export function smartFixAssembly(selectedIds: string[], prefs?: AssemblyPreferen
           next.delete('concurrent-chunk-management-engine-forge-c2me');
           next.delete('c2me-concurrent-chunk-management-engine');
           next.delete('c2mer');
+          next.delete('hc-harichunk');
         } else {
           next.delete(saveId);
         }
@@ -902,7 +992,8 @@ export function smartFixAssembly(selectedIds: string[], prefs?: AssemblyPreferen
   if (
     (next.has('c2me-concurrent-chunk-management-engine') ||
       next.has('concurrent-chunk-management-engine-forge-c2me') ||
-      next.has('c2mer')) &&
+      next.has('c2mer') ||
+      next.has('hc-harichunk')) &&
     focusId !== 'canary' &&
     focusId !== 'radium-reforged'
   ) {
@@ -912,6 +1003,23 @@ export function smartFixAssembly(selectedIds: string[], prefs?: AssemblyPreferen
     if (swappedOldLithium && !next.has('radium-re-reforged') && !getRuleConflictingIds('radium-re-reforged').some(c => next.has(c))) {
       next.add('radium-re-reforged');
     }
+  }
+
+  // Post-dependency re-check for shader-sensitive overlaps (e.g. when a shader addon pulls Oculus via transitive deps)
+  if (next.has('sodium-sightline') && (next.has('oculus') || next.has('emberlens'))) {
+    if (focusId === 'sodium-sightline') {
+      next.delete('oculus');
+      next.delete('emberlens');
+    } else {
+      next.delete('sodium-sightline');
+    }
+  }
+  if (
+    next.has('iris-oculus-flywheel-compat') &&
+    focusId !== 'iris-oculus-flywheel-compat' &&
+    (!next.has('flywheel') || (!next.has('oculus') && !next.has('emberlens')))
+  ) {
+    next.delete('iris-oculus-flywheel-compat');
   }
 
   // Auto-add paired companion fixes flagged by analyzeSelection
@@ -930,6 +1038,23 @@ export function smartFixAssembly(selectedIds: string[], prefs?: AssemblyPreferen
   }
   if (next.has('c2me-concurrent-chunk-management-engine') && !next.has('connector-extras')) {
     next.add('connector-extras');
+  }
+  const hasHeavyLodChunk = [
+    'distant-horizons',
+    'concurrent-chunk-management-engine-forge-c2me',
+    'c2me-concurrent-chunk-management-engine',
+    'c2mer',
+    'hc-harichunk',
+    'bobby-reforged',
+    'farsight',
+  ].some(id => next.has(id));
+  if (hasHeavyLodChunk) {
+    if (!next.has('modernfix') && !getRuleConflictingIds('modernfix').some(c => next.has(c))) {
+      next.add('modernfix');
+    }
+    if (!next.has('ferritecore') && !getRuleConflictingIds('ferritecore').some(c => next.has(c))) {
+      next.add('ferritecore');
+    }
   }
 
   // Clean orphaned mod-specific libraries whose consumers are not present
@@ -1168,9 +1293,22 @@ export function toggleModSmart(
     addCompanionIfSafe('distant-horizons-memory-fix-dh');
   }
   if (
+    next.has('distant-horizons') ||
+    next.has('concurrent-chunk-management-engine-forge-c2me') ||
+    next.has('c2me-concurrent-chunk-management-engine') ||
+    next.has('c2mer') ||
+    next.has('hc-harichunk') ||
+    next.has('bobby-reforged') ||
+    next.has('farsight')
+  ) {
+    addCompanionIfSafe('modernfix');
+    addCompanionIfSafe('ferritecore');
+  }
+  if (
     (modId === 'c2me-concurrent-chunk-management-engine' ||
       modId === 'concurrent-chunk-management-engine-forge-c2me' ||
-      modId === 'c2mer') &&
+      modId === 'c2mer' ||
+      modId === 'hc-harichunk') &&
     (next.has('canary') || next.has('radium-reforged'))
   ) {
     for (const oldLithiumId of ['canary', 'radium-reforged']) {
